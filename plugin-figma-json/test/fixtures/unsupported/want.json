@@ -1,0 +1,25 @@
+{
+  "color": {
+    "primary": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.2,
+          0.4,
+          0.8
+        ],
+        "alpha": 1
+      }
+    }
+  },
+  "spacing": {
+    "medium": {
+      "$type": "dimension",
+      "$value": {
+        "value": 16,
+        "unit": "px"
+      }
+    }
+  }
+}

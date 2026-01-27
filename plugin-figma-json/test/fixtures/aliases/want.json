@@ -1,0 +1,109 @@
+{
+  "color": {
+    "blue": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.2,
+          0.4,
+          0.9
+        ],
+        "alpha": 1
+      }
+    },
+    "green": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.2,
+          0.8,
+          0.3
+        ],
+        "alpha": 1
+      }
+    },
+    "red": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.9,
+          0.2,
+          0.2
+        ],
+        "alpha": 1
+      }
+    }
+  },
+  "numbers": {
+    "golden": {
+      "$type": "number",
+      "$value": 1.618,
+      "$description": "Alias to ratio"
+    },
+    "ratio": {
+      "$type": "number",
+      "$value": 1.618
+    }
+  },
+  "semantic": {
+    "danger": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.9,
+          0.2,
+          0.2
+        ],
+        "alpha": 1
+      },
+      "$description": "Alias to red"
+    },
+    "primary": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.2,
+          0.4,
+          0.9
+        ],
+        "alpha": 1
+      },
+      "$description": "Alias to blue"
+    },
+    "success": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.2,
+          0.8,
+          0.3
+        ],
+        "alpha": 1
+      },
+      "$description": "Alias to green"
+    }
+  },
+  "spacing": {
+    "base": {
+      "$type": "dimension",
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      }
+    },
+    "double": {
+      "$type": "dimension",
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      },
+      "$description": "Alias to base spacing"
+    }
+  }
+}

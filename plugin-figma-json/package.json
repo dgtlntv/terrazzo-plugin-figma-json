@@ -1,0 +1,59 @@
+{
+  "name": "terrazzo-plugin-figma-json",
+  "version": "0.0.1",
+  "description": "Convert DTCG design tokens JSON into Figma-compatible design tokens JSON format.",
+  "license": "MIT",
+  "type": "module",
+  "author": {
+    "name": "Your Name",
+    "email": "your@email.com"
+  },
+  "keywords": [
+    "design tokens",
+    "design system",
+    "dtcg",
+    "w3c",
+    "figma",
+    "terrazzo"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rolldown -c && tsc --emitDeclarationOnly",
+    "dev": "rolldown -w -c",
+    "format": "biome check --fix --unsafe .",
+    "lint": "pnpm run \"/^lint:(js|ts)/\"",
+    "lint:js": "biome check .",
+    "lint:ts": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm run build"
+  },
+  "peerDependencies": {
+    "@terrazzo/cli": "^2.0.0-beta.0",
+    "@terrazzo/parser": "^2.0.0-beta.0"
+  },
+  "dependencies": {
+    "colorjs.io": "^0.6.1",
+    "wildcard-match": "^5.1.4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.13",
+    "@terrazzo/cli": "2.0.0-beta.0",
+    "@terrazzo/parser": "2.0.0-beta.0",
+    "@types/node": "^25.0.10",
+    "rolldown": "1.0.0-rc.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "color": {
+    "displayP3": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0,
+          0.985764,
+          0.159742
+        ],
+        "alpha": 0.8
+      },
+      "$description": "Green in Display P3"
+    },
+    "hsl": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "hsl",
+        "components": [
+          120,
+          100,
+          50
+        ],
+        "alpha": 1
+      },
+      "$description": "Green in HSL"
+    },
+    "lab": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.653419,
+          0.32373,
+          0.806873
+        ],
+        "alpha": 1
+      },
+      "$description": "Purple in Lab"
+    },
+    "oklch": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          0.999901,
+          0,
+          0.999914
+        ],
+        "alpha": 1
+      },
+      "$description": "Magenta in OKLCH"
+    },
+    "srgb": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          1,
+          0,
+          0
+        ],
+        "alpha": 1
+      },
+      "$description": "Red in sRGB"
+    }
+  }
+}

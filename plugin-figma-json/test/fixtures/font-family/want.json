@@ -1,0 +1,31 @@
+{
+  "font": {
+    "family": {
+      "code": {
+        "$type": "fontFamily",
+        "$value": "JetBrains Mono",
+        "$description": "Monospace font with fallbacks"
+      },
+      "primary": {
+        "$type": "fontFamily",
+        "$value": "Inter",
+        "$description": "Primary font family as string"
+      },
+      "secondary": {
+        "$type": "fontFamily",
+        "$value": "Roboto",
+        "$description": "Secondary font family as string"
+      },
+      "single-array": {
+        "$type": "fontFamily",
+        "$value": "Georgia",
+        "$description": "Single font in array format"
+      },
+      "with-fallbacks": {
+        "$type": "fontFamily",
+        "$value": "Helvetica Neue",
+        "$description": "Font with fallback stack (will be truncated)"
+      }
+    }
+  }
+}
