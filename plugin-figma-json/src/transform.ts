@@ -52,6 +52,8 @@ function transformToken(
     return;
   }
 
+  const partialAliasOf = (token as { partialAliasOf?: Record<string, string | undefined> }).partialAliasOf;
+
   // Convert the token value (always resolve to final value)
   const result = convertToken(token, rawValue, {
     logger: context.logger,
@@ -60,7 +62,7 @@ function transformToken(
     extensions: token.$extensions,
     allTokens,
     originalValue: token.originalValue?.$value,
-    partialAliasOf: (token as { partialAliasOf?: Record<string, string | undefined> }).partialAliasOf,
+    partialAliasOf,
   });
 
   // Skip if converter indicates to skip
@@ -123,6 +125,33 @@ function transformToken(
       directAliasOf = originalValueStr.slice(1, -1);
     }
     transformedValue._aliasOf = directAliasOf;
+  } else if (token.$type === 'color' && partialAliasOf) {
+    // For colors without a direct alias, check if all components reference the same token
+    // This handles JSON pointer references like { "$ref": "#/color/palette/white/$value/colorSpace" }
+    const colorPartialAlias = partialAliasOf as {
+      colorSpace?: string;
+      components?: (string | undefined)[];
+      alpha?: string;
+    };
+
+    // Collect all non-undefined references
+    const refs: string[] = [];
+    if (colorPartialAlias.colorSpace) refs.push(colorPartialAlias.colorSpace);
+    if (colorPartialAlias.components) {
+      for (const comp of colorPartialAlias.components) {
+        if (comp) refs.push(comp);
+      }
+    }
+    // Note: we don't include alpha in the "same token" check since it often references
+    // a different token (like number.opacity.backdrop)
+
+    // If all color references (colorSpace + components) point to the same token, use it as aliasOf
+    if (refs.length > 0) {
+      const uniqueRefs = [...new Set(refs)];
+      if (uniqueRefs.length === 1) {
+        transformedValue._aliasOf = uniqueRefs[0];
+      }
+    }
   }
 
   setTransform(token.id, {
