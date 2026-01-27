@@ -13,6 +13,7 @@ import { convertDuration } from './duration.js';
 import { convertFontFamily } from './font-family.js';
 import { convertFontWeight } from './font-weight.js';
 import { convertNumber } from './number.js';
+import { convertTypography } from './typography.js';
 
 /**
  * Converter function signature.
@@ -29,6 +30,7 @@ const converters: Record<SupportedType, Converter> = {
   fontFamily: convertFontFamily,
   fontWeight: convertFontWeight,
   number: convertNumber,
+  typography: convertTypography,
 };
 
 /**

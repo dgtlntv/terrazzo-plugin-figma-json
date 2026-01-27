@@ -1,11 +1,31 @@
 import type { TransformHookOptions, TokenNormalized } from '@terrazzo/parser';
 import wcmatch from 'wildcard-match';
 import { convertToken } from './converters/index.js';
-import { type FigmaJsonPluginOptions, FORMAT_ID } from './lib.js';
+import { type FigmaJsonPluginOptions, FORMAT_ID, type TokenExtensions } from './lib.js';
 
 export interface TransformOptions {
   transform: TransformHookOptions;
   options: FigmaJsonPluginOptions;
+}
+
+/**
+ * Filter extensions to only include Figma-specific ones (com.figma.*).
+ * Returns undefined if no Figma extensions exist.
+ */
+function filterFigmaExtensions(extensions: TokenExtensions | undefined): TokenExtensions | undefined {
+  if (!extensions) return undefined;
+
+  const figmaExtensions: TokenExtensions = {};
+  let hasFigmaExtensions = false;
+
+  for (const [key, value] of Object.entries(extensions)) {
+    if (key.startsWith('com.figma')) {
+      figmaExtensions[key] = value;
+      hasFigmaExtensions = true;
+    }
+  }
+
+  return hasFigmaExtensions ? figmaExtensions : undefined;
 }
 
 /**
@@ -39,10 +59,43 @@ function transformToken(
     tokenId: token.id,
     extensions: token.$extensions,
     allTokens,
+    originalValue: token.originalValue?.$value,
+    partialAliasOf: (token as { partialAliasOf?: Record<string, string | undefined> }).partialAliasOf,
   });
 
   // Skip if converter indicates to skip
   if (result.skip) {
+    return;
+  }
+
+  // Handle split tokens (e.g., typography)
+  if (result.split && result.subTokens) {
+    for (const subToken of result.subTokens) {
+      const subId = `${token.id}.${subToken.idSuffix}`;
+      const transformedValue: Record<string, unknown> = {
+        $type: subToken.$type,
+        $value: subToken.value,
+        // Include metadata for build phase to identify split sub-tokens
+        _splitFrom: token.id, // Parent token ID for source lookup
+        _tokenId: subId, // This sub-token's ID
+      };
+      // Preserve alias reference for sub-token if it was a reference
+      if (subToken.aliasOf) {
+        transformedValue._aliasOf = subToken.aliasOf;
+      }
+      if (token.$description) {
+        transformedValue.$description = token.$description;
+      }
+      const subTokenFigmaExtensions = filterFigmaExtensions(token.$extensions);
+      if (subTokenFigmaExtensions) {
+        transformedValue.$extensions = subTokenFigmaExtensions;
+      }
+      setTransform(subId, {
+        format: FORMAT_ID,
+        value: JSON.stringify(transformedValue),
+        input,
+      });
+    }
     return;
   }
 
@@ -54,8 +107,9 @@ function transformToken(
   if (token.$description) {
     transformedValue.$description = token.$description;
   }
-  if (token.$extensions) {
-    transformedValue.$extensions = token.$extensions;
+  const figmaExtensions = filterFigmaExtensions(token.$extensions);
+  if (figmaExtensions) {
+    transformedValue.$extensions = figmaExtensions;
   }
 
   // Store aliasOf for build step to create Figma aliasData extension

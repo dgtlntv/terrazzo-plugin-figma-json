@@ -61,6 +61,13 @@ describe('figma-json plugin', () => {
     await expect(contents).toMatchFileSnapshot(fileURLToPath(new URL('./fixtures/aliases/want.json', import.meta.url)));
   });
 
+  it('typography token splitting', async () => {
+    const contents = await runPlugin('./fixtures/typography/');
+    await expect(contents).toMatchFileSnapshot(
+      fileURLToPath(new URL('./fixtures/typography/want.json', import.meta.url)),
+    );
+  });
+
   it('respects exclude option', async () => {
     const output = 'actual.json';
     const cwd = new URL('./fixtures/basic/', import.meta.url);

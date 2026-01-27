@@ -11,7 +11,15 @@ export const FILE_PREFIX = `/**
 /**
  * Token types supported by Figma.
  */
-export const SUPPORTED_TYPES = ['color', 'dimension', 'duration', 'fontFamily', 'fontWeight', 'number'] as const;
+export const SUPPORTED_TYPES = [
+  'color',
+  'dimension',
+  'duration',
+  'fontFamily',
+  'fontWeight',
+  'number',
+  'typography',
+] as const;
 
 export type SupportedType = (typeof SUPPORTED_TYPES)[number];
 
@@ -22,7 +30,6 @@ export const UNSUPPORTED_TYPES = [
   'shadow',
   'border',
   'gradient',
-  'typography',
   'transition',
   'strokeStyle',
   'cubicBezier',
@@ -94,6 +101,8 @@ export interface FigmaTokenValue {
 
 /**
  * Mapping from DTCG types to Figma variable types.
+ * Note: Typography is a composite type that splits into sub-tokens, so it doesn't
+ * have a direct Figma mapping. The placeholder 'String' is never actually used.
  */
 export const DTCG_TO_FIGMA_TYPE_MAP: Record<SupportedType, FigmaVariableType> = {
   color: 'Color',
@@ -102,6 +111,7 @@ export const DTCG_TO_FIGMA_TYPE_MAP: Record<SupportedType, FigmaVariableType> = 
   fontFamily: 'String',
   fontWeight: 'Number', // Can also be String depending on input value
   number: 'Number', // Can also be Boolean via extension
+  typography: 'String', // Composite type - splits into sub-tokens, this is never used
 };
 
 /**
@@ -119,6 +129,29 @@ export interface ConverterContext {
    * All tokens in the design system, used for alias validation.
    */
   allTokens?: Record<string, TokenNormalized>;
+  /**
+   * Original value before resolution (for checking references in composite types).
+   */
+  originalValue?: unknown;
+  /**
+   * Partial alias information for composite types (e.g., typography).
+   * Maps sub-property names to their alias target token IDs.
+   */
+  partialAliasOf?: Record<string, string | undefined>;
+}
+
+/**
+ * Sub-token information for split composite tokens (e.g., typography).
+ */
+export interface SubToken {
+  /** Suffix to append to parent token ID (e.g., "fontFamily" -> parent.id + ".fontFamily") */
+  idSuffix: string;
+  /** The $type for this sub-token */
+  $type: string;
+  /** The converted value */
+  value: unknown;
+  /** If this sub-property was a reference, the target token ID */
+  aliasOf?: string;
 }
 
 /**
@@ -131,6 +164,10 @@ export interface ConverterResult {
   skip?: boolean;
   /** Override the output $type (e.g., fontWeight outputs as 'number' or 'string'). */
   outputType?: string;
+  /** Whether this is a split composite token (e.g., typography). */
+  split?: boolean;
+  /** Sub-tokens for split composite types. */
+  subTokens?: SubToken[];
 }
 
 /**
@@ -156,6 +193,17 @@ export interface DTCGDimensionValue {
 export interface DTCGDurationValue {
   value: number;
   unit: string;
+}
+
+/**
+ * Typography value structure in DTCG format.
+ */
+export interface DTCGTypographyValue {
+  fontFamily?: string | string[];
+  fontSize?: DTCGDimensionValue;
+  fontWeight?: number | string;
+  lineHeight?: number | DTCGDimensionValue;
+  letterSpacing?: DTCGDimensionValue;
 }
 
 /**

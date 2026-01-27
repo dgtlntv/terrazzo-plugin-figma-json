@@ -5,6 +5,7 @@ import { convertDuration } from '../src/converters/duration.js';
 import { convertFontFamily } from '../src/converters/font-family.js';
 import { convertFontWeight } from '../src/converters/font-weight.js';
 import { convertNumber } from '../src/converters/number.js';
+import { convertTypography } from '../src/converters/typography.js';
 import type { ConverterContext } from '../src/lib.js';
 
 /**
@@ -422,5 +423,244 @@ describe('convertNumber', () => {
     const result = convertNumber(Number.MIN_VALUE, ctx);
 
     expect(result.value).toBe(Number.MIN_VALUE);
+  });
+});
+
+describe('convertTypography', () => {
+  it('splits typography into sub-tokens with all properties', () => {
+    const ctx = createContext();
+    const result = convertTypography(
+      {
+        fontFamily: 'Inter',
+        fontSize: { value: 16, unit: 'px' },
+        fontWeight: 400,
+        lineHeight: 1.5,
+        letterSpacing: { value: 0, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(5);
+
+    // Check fontFamily
+    const fontFamilyToken = result.subTokens?.find((t) => t.idSuffix === 'fontFamily');
+    expect(fontFamilyToken?.$type).toBe('fontFamily');
+    expect(fontFamilyToken?.value).toBe('Inter');
+
+    // Check fontSize
+    const fontSizeToken = result.subTokens?.find((t) => t.idSuffix === 'fontSize');
+    expect(fontSizeToken?.$type).toBe('dimension');
+    expect(fontSizeToken?.value).toEqual({ value: 16, unit: 'px' });
+
+    // Check fontWeight
+    const fontWeightToken = result.subTokens?.find((t) => t.idSuffix === 'fontWeight');
+    expect(fontWeightToken?.$type).toBe('number');
+    expect(fontWeightToken?.value).toBe(400);
+
+    // Check lineHeight
+    const lineHeightToken = result.subTokens?.find((t) => t.idSuffix === 'lineHeight');
+    expect(lineHeightToken?.$type).toBe('number');
+    expect(lineHeightToken?.value).toBe(1.5);
+
+    // Check letterSpacing
+    const letterSpacingToken = result.subTokens?.find((t) => t.idSuffix === 'letterSpacing');
+    expect(letterSpacingToken?.$type).toBe('dimension');
+    expect(letterSpacingToken?.value).toEqual({ value: 0, unit: 'px' });
+  });
+
+  it('handles missing optional sub-properties', () => {
+    const ctx = createContext();
+    const result = convertTypography(
+      {
+        fontFamily: 'Inter',
+        fontSize: { value: 16, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(2);
+    expect(result.subTokens?.map((t) => t.idSuffix)).toEqual(['fontFamily', 'fontSize']);
+  });
+
+  it('handles fontFamily as array (takes first)', () => {
+    const ctx = createContext();
+    const result = convertTypography(
+      {
+        fontFamily: ['Inter', 'Helvetica', 'sans-serif'],
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    const fontFamilyToken = result.subTokens?.find((t) => t.idSuffix === 'fontFamily');
+    expect(fontFamilyToken?.value).toBe('Inter');
+  });
+
+  it('handles fontWeight as string alias', () => {
+    const ctx = createContext();
+    const result = convertTypography(
+      {
+        fontWeight: 'bold',
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    const fontWeightToken = result.subTokens?.find((t) => t.idSuffix === 'fontWeight');
+    expect(fontWeightToken?.$type).toBe('string');
+    expect(fontWeightToken?.value).toBe('bold');
+  });
+
+  it('handles lineHeight as dimension', () => {
+    const ctx = createContext();
+    const result = convertTypography(
+      {
+        lineHeight: { value: 24, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    const lineHeightToken = result.subTokens?.find((t) => t.idSuffix === 'lineHeight');
+    expect(lineHeightToken?.$type).toBe('dimension');
+    expect(lineHeightToken?.value).toEqual({ value: 24, unit: 'px' });
+  });
+
+  it('converts rem to px for fontSize', () => {
+    const ctx = createContext();
+    const result = convertTypography(
+      {
+        fontSize: { value: 1, unit: 'rem' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    const fontSizeToken = result.subTokens?.find((t) => t.idSuffix === 'fontSize');
+    expect(fontSizeToken?.value).toEqual({ value: 16, unit: 'px' });
+  });
+
+  it('warns and skips invalid typography value', () => {
+    const ctx = createContext();
+    const result = convertTypography('not an object', ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('warns and skips typography with no valid sub-properties', () => {
+    const ctx = createContext();
+    const result = convertTypography({}, ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('skips invalid sub-properties but includes valid ones', () => {
+    const ctx = createContext();
+    const result = convertTypography(
+      {
+        fontFamily: 'Inter',
+        fontSize: { value: Infinity, unit: 'px' }, // Invalid - should be skipped
+        fontWeight: 400,
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(2);
+    expect(result.subTokens?.map((t) => t.idSuffix)).toEqual(['fontFamily', 'fontWeight']);
+  });
+
+  it('preserves aliasOf for primitive token references', () => {
+    const ctx = createContext({
+      partialAliasOf: {
+        fontFamily: 'typography.fontFamily.sansSerif',
+        fontSize: 'dimension.size.100',
+      },
+      allTokens: {
+        'typography.fontFamily.sansSerif': { $type: 'fontFamily' },
+        'dimension.size.100': { $type: 'dimension' },
+      },
+    });
+    const result = convertTypography(
+      {
+        fontFamily: 'Inter',
+        fontSize: { value: 16, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    const fontFamilyToken = result.subTokens?.find((t) => t.idSuffix === 'fontFamily');
+    const fontSizeToken = result.subTokens?.find((t) => t.idSuffix === 'fontSize');
+    // Primitive references are kept as-is
+    expect(fontFamilyToken?.aliasOf).toBe('typography.fontFamily.sansSerif');
+    expect(fontSizeToken?.aliasOf).toBe('dimension.size.100');
+  });
+
+  it('appends property name when referencing typography token (JSON pointer to typography)', () => {
+    const ctx = createContext({
+      partialAliasOf: {
+        fontFamily: 'typography.base',
+        fontSize: 'typography.base',
+        lineHeight: 'typography.base',
+      },
+      allTokens: {
+        'typography.base': { $type: 'typography' },
+      },
+    });
+    const result = convertTypography(
+      {
+        fontFamily: 'Inter',
+        fontSize: { value: 16, unit: 'px' },
+        lineHeight: 1.5,
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    const fontFamilyToken = result.subTokens?.find((t) => t.idSuffix === 'fontFamily');
+    const fontSizeToken = result.subTokens?.find((t) => t.idSuffix === 'fontSize');
+    const lineHeightToken = result.subTokens?.find((t) => t.idSuffix === 'lineHeight');
+    // Typography references get the property name appended
+    expect(fontFamilyToken?.aliasOf).toBe('typography.base.fontFamily');
+    expect(fontSizeToken?.aliasOf).toBe('typography.base.fontSize');
+    expect(lineHeightToken?.aliasOf).toBe('typography.base.lineHeight');
+  });
+
+  it('handles mixed references (some to typography, some to primitives)', () => {
+    const ctx = createContext({
+      partialAliasOf: {
+        fontFamily: 'typography.base', // typography token
+        fontSize: 'dimension.size.100', // primitive token
+        fontWeight: 'typography.weight.bold', // primitive (fontWeight type)
+      },
+      allTokens: {
+        'typography.base': { $type: 'typography' },
+        'dimension.size.100': { $type: 'dimension' },
+        'typography.weight.bold': { $type: 'fontWeight' },
+      },
+    });
+    const result = convertTypography(
+      {
+        fontFamily: 'Inter',
+        fontSize: { value: 16, unit: 'px' },
+        fontWeight: 700,
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    const fontFamilyToken = result.subTokens?.find((t) => t.idSuffix === 'fontFamily');
+    const fontSizeToken = result.subTokens?.find((t) => t.idSuffix === 'fontSize');
+    const fontWeightToken = result.subTokens?.find((t) => t.idSuffix === 'fontWeight');
+    // Typography reference gets property appended
+    expect(fontFamilyToken?.aliasOf).toBe('typography.base.fontFamily');
+    // Primitive references stay as-is
+    expect(fontSizeToken?.aliasOf).toBe('dimension.size.100');
+    expect(fontWeightToken?.aliasOf).toBe('typography.weight.bold');
   });
 });

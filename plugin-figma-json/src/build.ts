@@ -122,12 +122,29 @@ export default function buildFigmaJson({
   }
 
   // Helper to get the primary collection name for a token (prefers set over modifier)
+  // Also handles split sub-token IDs by looking up the parent token
   function getTokenCollection(tokenId: string): string | undefined {
     const sources = tokenSources.get(tokenId);
-    if (!sources?.length) return undefined;
-    // Prefer set source over modifier source
-    const setSource = sources.find((s) => !s.isModifier);
-    return setSource?.source ?? sources[0]?.source;
+    if (sources?.length) {
+      // Prefer set source over modifier source
+      const setSource = sources.find((s) => !s.isModifier);
+      return setSource?.source ?? sources[0]?.source;
+    }
+
+    // If not found, this might be a split sub-token ID (e.g., "typography.text.primary.$root.fontFamily")
+    // Try to find the parent token by progressively removing the last segment
+    const parts = tokenId.split('.');
+    while (parts.length > 1) {
+      parts.pop();
+      const parentId = parts.join('.');
+      const parentSources = tokenSources.get(parentId);
+      if (parentSources?.length) {
+        const setSource = parentSources.find((s) => !s.isModifier);
+        return setSource?.source ?? parentSources[0]?.source;
+      }
+    }
+
+    return undefined;
   }
 
   // Process sets - these tokens always appear in their set file
@@ -186,10 +203,34 @@ export default function buildFigmaJson({
 
   // Process set tokens using default transforms
   for (const transform of defaultTransforms) {
-    const tokenId = transform.token.id;
+    const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
+
+    // Handle split sub-tokens (e.g., typography.text.primary.fontFamily)
+    // These don't have a token object but have _splitFrom metadata
+    let tokenId: string;
+    let outputName: string;
+    let aliasOf: string | undefined;
+    let sourceLookupId: string;
+
+    if (transform.token) {
+      tokenId = transform.token.id;
+      outputName = tokenName?.(transform.token) ?? tokenId;
+      aliasOf = parsedValue._aliasOf ?? transform.token.aliasOf;
+      sourceLookupId = tokenId;
+    } else if (parsedValue._splitFrom && parsedValue._tokenId) {
+      // Split sub-token: use parent's source
+      tokenId = parsedValue._tokenId;
+      outputName = tokenId;
+      aliasOf = parsedValue._aliasOf;
+      sourceLookupId = parsedValue._splitFrom; // Look up source using parent token ID
+    } else {
+      // Unknown transform without token - skip
+      continue;
+    }
+
     if (shouldExclude(tokenId)) continue;
 
-    const sources = tokenSources.get(tokenId) ?? [];
+    const sources = tokenSources.get(sourceLookupId) ?? [];
     const setSource = sources.find((s) => !s.isModifier);
     if (!setSource) continue; // Skip tokens that aren't in a set
 
@@ -198,11 +239,7 @@ export default function buildFigmaJson({
       outputBySource.set(sourceName, {});
     }
 
-    const outputName = tokenName?.(transform.token) ?? tokenId;
-    const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
-
-    // Get aliasOf from the transformed value or token
-    const aliasOf = parsedValue._aliasOf ?? transform.token.aliasOf;
+    // Get aliasOf from the transformed value or token (already set above)
 
     // Handle alias references based on preserveReferences setting
     if (preserveReferences && aliasOf) {
@@ -222,8 +259,10 @@ export default function buildFigmaJson({
       }
     }
 
-    // Remove internal _aliasOf before output
+    // Remove internal metadata before output
     delete parsedValue._aliasOf;
+    delete parsedValue._splitFrom;
+    delete parsedValue._tokenId;
 
     setNestedProperty(outputBySource.get(sourceName)!, outputName, parsedValue);
   }
@@ -271,8 +310,8 @@ export default function buildFigmaJson({
     for (const tokenId of tokenIds) {
       if (shouldExclude(tokenId)) continue;
 
-      // Find the transform for this token
-      const transform = contextTransforms.find((t) => t.token.id === tokenId);
+      // Find the transform for this token (skip transforms without tokens - synthetic sub-tokens)
+      const transform = contextTransforms.find((t) => t.token?.id === tokenId);
       if (!transform) continue;
 
       const outputName = tokenName?.(transform.token) ?? tokenId;
@@ -299,8 +338,10 @@ export default function buildFigmaJson({
         }
       }
 
-      // Remove internal _aliasOf before output
+      // Remove internal metadata before output
       delete parsedValue._aliasOf;
+      delete parsedValue._splitFrom;
+      delete parsedValue._tokenId;
 
       setNestedProperty(outputBySource.get(contextKey)!, outputName, parsedValue);
     }
