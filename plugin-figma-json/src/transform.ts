@@ -61,7 +61,14 @@ function transformToken(
   // Store aliasOf for build step to create Figma aliasData extension
   // Figma wants resolved $value + aliasData extension for cross-collection references
   if (aliasOf) {
-    transformedValue._aliasOf = aliasOf;
+    // Use originalValue.$value to get the direct reference (not fully resolved chain)
+    // e.g., "{dimension.size.height.baseline}" instead of "dimension.100"
+    const originalValueStr = token.originalValue?.$value;
+    let directAliasOf = aliasOf;
+    if (typeof originalValueStr === 'string' && originalValueStr.startsWith('{') && originalValueStr.endsWith('}')) {
+      directAliasOf = originalValueStr.slice(1, -1);
+    }
+    transformedValue._aliasOf = directAliasOf;
   }
 
   setTransform(token.id, {

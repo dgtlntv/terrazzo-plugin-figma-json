@@ -73,6 +73,7 @@ export default function figmaJsonPlugin(options?: FigmaJsonPluginOptions): Plugi
         exclude: options?.exclude,
         tokenName: options?.tokenName,
         splitByResolver,
+        preserveReferences: options?.preserveReferences,
         resolver,
       });
 

@@ -223,10 +223,13 @@ export interface FigmaJsonPluginOptions {
   warnOnUnsupported?: boolean;
 
   /**
-   * Preserve token references (aliases) in the output instead of resolving them.
-   * When true, tokens that alias other tokens will output the reference syntax
-   * (e.g., "{dimension.100}") instead of the resolved value.
-   * @default false
+   * Preserve token references (aliases) in the output.
+   * When true:
+   * - Same-file references use curly brace syntax in $value (e.g., "{dimension.100}")
+   * - Cross-file references use resolved $value + com.figma.aliasData extension
+   * When false:
+   * - All values are fully resolved, no references preserved
+   * @default true
    */
   preserveReferences?: boolean;
 

@@ -7,6 +7,7 @@ export interface BuildOptions {
   tokenName?: FigmaJsonPluginOptions['tokenName'];
   getTransforms: BuildHookOptions['getTransforms'];
   splitByResolver?: FigmaJsonPluginOptions['splitByResolver'];
+  preserveReferences?: FigmaJsonPluginOptions['preserveReferences'];
   resolver?: Resolver;
 }
 
@@ -95,6 +96,7 @@ export default function buildFigmaJson({
   exclude,
   tokenName,
   splitByResolver,
+  preserveReferences = true,
   resolver,
 }: BuildOptions): BuildResult {
   // Create exclude matcher
@@ -198,6 +200,31 @@ export default function buildFigmaJson({
 
     const outputName = tokenName?.(transform.token) ?? tokenId;
     const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
+
+    // Get aliasOf from the transformed value or token
+    const aliasOf = parsedValue._aliasOf ?? transform.token.aliasOf;
+
+    // Handle alias references based on preserveReferences setting
+    if (preserveReferences && aliasOf) {
+      const targetCollection = getTokenCollection(aliasOf);
+
+      if (targetCollection === sourceName) {
+        // Same file reference: use curly brace syntax
+        parsedValue.$value = `{${aliasOf}}`;
+      } else if (targetCollection) {
+        // Cross-file reference: use resolved value + aliasData
+        const extensions = parsedValue.$extensions ?? {};
+        extensions['com.figma.aliasData'] = {
+          targetVariableSetName: targetCollection,
+          targetVariableName: toFigmaVariableName(aliasOf),
+        };
+        parsedValue.$extensions = extensions;
+      }
+    }
+
+    // Remove internal _aliasOf before output
+    delete parsedValue._aliasOf;
+
     setNestedProperty(outputBySource.get(sourceName)!, outputName, parsedValue);
   }
 
@@ -254,10 +281,15 @@ export default function buildFigmaJson({
       // Get aliasOf from the transformed value (set during transform step) or fall back to token
       const aliasOf = parsedValue._aliasOf ?? transform.token.aliasOf;
 
-      // Add aliasData for cross-collection references if this is an alias
-      if (aliasOf) {
+      // Handle alias references based on preserveReferences setting
+      if (preserveReferences && aliasOf) {
         const targetCollection = getTokenCollection(aliasOf);
-        if (targetCollection) {
+
+        if (targetCollection === contextKey) {
+          // Same file reference: use curly brace syntax
+          parsedValue.$value = `{${aliasOf}}`;
+        } else if (targetCollection) {
+          // Cross-file reference: use resolved value + aliasData
           const extensions = parsedValue.$extensions ?? {};
           extensions['com.figma.aliasData'] = {
             targetVariableSetName: targetCollection,
