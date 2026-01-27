@@ -19,43 +19,20 @@ function transformToken(
   context: TransformHookOptions['context'],
   allTokens: Record<string, TokenNormalized>,
   setTransform: TransformHookOptions['setTransform'],
-  transformParams: { mode?: string; input?: Record<string, string> }
+  input: Record<string, string>
 ): void {
-  // Check if this token is an alias and we want to preserve references
-  if (options.preserveReferences && aliasOf) {
-    // Preserve the alias reference instead of the resolved value
-    const aliasValue = `{${aliasOf}}`;
-    const transformedValue: Record<string, unknown> = {
-      $type: token.$type,
-      $value: aliasValue,
-    };
-    if (token.$description) {
-      transformedValue.$description = token.$description;
-    }
-    if (token.$extensions) {
-      transformedValue.$extensions = token.$extensions;
-    }
-
-    setTransform(token.id, {
-      format: FORMAT_ID,
-      value: JSON.stringify(transformedValue),
-      ...transformParams,
-    });
-    return;
-  }
-
   // Allow custom transform to override
   const customValue = options.transform?.(token);
   if (customValue !== undefined) {
     setTransform(token.id, {
       format: FORMAT_ID,
       value: JSON.stringify(customValue),
-      ...transformParams,
+      input,
     });
     return;
   }
 
-  // Convert the token value
+  // Convert the token value (always resolve to final value)
   const result = convertToken(token, rawValue, {
     logger: context.logger,
     options,
@@ -69,7 +46,7 @@ function transformToken(
     return;
   }
 
-  // Build the transformed token structure
+  // Build the transformed token structure with resolved value
   const transformedValue: Record<string, unknown> = {
     $type: result.outputType ?? token.$type,
     $value: result.value,
@@ -81,74 +58,55 @@ function transformToken(
     transformedValue.$extensions = token.$extensions;
   }
 
-  console.log(`[DEBUG transform] setTransform ${token.id}, params=${JSON.stringify(transformParams)}`);
+  // Store aliasOf for build step to create Figma aliasData extension
+  // Figma wants resolved $value + aliasData extension for cross-collection references
+  if (aliasOf) {
+    transformedValue._aliasOf = aliasOf;
+  }
+
   setTransform(token.id, {
     format: FORMAT_ID,
     value: JSON.stringify(transformedValue),
-    ...transformParams,
+    input,
   });
 }
 
 /**
  * Transform DTCG tokens into Figma-compatible format.
+ * Requires a resolver file - legacy mode is not supported.
  */
 export default function transformFigmaJson({ transform, options }: TransformOptions): void {
-  const { tokens, setTransform, context, resolver } = transform;
+  const { setTransform, context, resolver } = transform;
 
-  console.log(`[DEBUG transform] tokens count=${Object.keys(tokens).length}, resolver=${!!resolver}, resolver.source=${!!resolver?.source}, listPermutations=${!!resolver?.listPermutations}`);
+  // Require resolver
+  if (!resolver?.source || !resolver.listPermutations) {
+    return;
+  }
+
+  const permutations = resolver.listPermutations();
 
   // Create exclude matcher
   const shouldExclude = options.exclude?.length ? wcmatch(options.exclude) : () => false;
 
-  // Check if we're using a resolver with permutations
-  if (resolver?.source && resolver.listPermutations) {
-    const permutations = resolver.listPermutations();
-    console.log(`[DEBUG transform] permutations count=${permutations.length}`);
+  // Process each permutation (context combination)
+  for (const input of permutations) {
+    const contextTokens = resolver.apply(input);
 
-    // Process each permutation (context combination)
-    for (const input of permutations) {
-      const contextTokens = resolver.apply(input);
-      console.log(`[DEBUG transform] input=${JSON.stringify(input)}, contextTokens count=${Object.keys(contextTokens).length}`);
-
-      for (const token of Object.values(contextTokens)) {
-        if (shouldExclude(token.id)) {
-          continue;
-        }
-
-        transformToken(
-          token,
-          token.$value,
-          token.aliasOf,
-          options,
-          context,
-          contextTokens,
-          setTransform,
-          { input }
-        );
-      }
-    }
-  } else {
-    // Legacy mode-based processing
-    for (const token of Object.values(tokens)) {
+    for (const token of Object.values(contextTokens)) {
       if (shouldExclude(token.id)) {
         continue;
       }
 
-      // Process each mode
-      for (const [modeName, modeValue] of Object.entries(token.mode)) {
-        const aliasOf = modeValue.aliasOf ?? token.aliasOf;
-
-        transformToken(
-          token,
-          modeValue.$value,
-          aliasOf,
-          options,
-          context,
-          tokens,
-          setTransform,
-          { mode: modeName }
-        );
-      }
+      transformToken(
+        token,
+        token.$value,
+        token.aliasOf,
+        options,
+        context,
+        contextTokens,
+        setTransform,
+        input
+      );
     }
   }
 }

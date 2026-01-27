@@ -76,14 +76,11 @@ export default function figmaJsonPlugin(options?: FigmaJsonPluginOptions): Plugi
         resolver,
       });
 
-      console.log(`[DEBUG] result.split=${!!result.split}, result.single=${!!result.single}`);
       if (result.split) {
-        console.log(`[DEBUG] result.split size=${result.split.size}`);
         // Output multiple files based on resolver structure
         for (const [sourceName, contents] of result.split) {
           // sourceName is like "primitive" or "breakpoint-small"
           const outputName = `${sourceName}.${filename}`;
-          console.log(`[DEBUG] Writing ${outputName}`);
           outputFile(outputName, contents);
         }
       } else if (result.single) {

@@ -2,3 +2,4 @@ node_modules
 .claude
 learnings.md
 tokens
+dist
