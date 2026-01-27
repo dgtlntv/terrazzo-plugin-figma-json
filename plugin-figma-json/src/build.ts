@@ -74,11 +74,16 @@ function normalizeRootInPath(path: string): string {
   return path.replace(/\.\$root\b/g, '.root');
 }
 
+/**
+ * Token source tracking info.
+ */
+type SourceInfo = { source: string; isModifier: boolean; modifierName?: string; contextName?: string };
+
 interface HandleAliasReferenceOptions {
   parsedValue: Record<string, unknown>;
   aliasOf: string;
   sourceName: string;
-  getTokenCollection: (tokenId: string) => string | undefined;
+  tokenSources: Map<string, SourceInfo[]>;
   tokenOutputPaths: Map<string, string>;
   preserveReferences: boolean;
 }
@@ -90,11 +95,16 @@ interface HandleAliasReferenceOptions {
  * - Same-file references: Sets $value to curly brace syntax (e.g., "{color.primary}")
  * - Cross-file references: Keeps resolved $value and adds com.figma.aliasData extension
  *
+ * The function checks for target token in this order:
+ * 1. Current context (same-file reference)
+ * 2. Set sources only (cross-file reference to primitive/semantic sets)
+ * 3. Never references other modifier contexts (e.g., dark won't reference light)
+ *
  * @param options - Configuration for alias handling
  * @param options.parsedValue - Token value object to modify (mutated)
  * @param options.aliasOf - Target token ID this token references
  * @param options.sourceName - Name of the current output file/collection
- * @param options.getTokenCollection - Function to look up a token's collection
+ * @param options.tokenSources - Map of token IDs to their source info
  * @param options.tokenOutputPaths - Map of token IDs to their output paths
  * @param options.preserveReferences - Whether to preserve references (false = no-op)
  */
@@ -102,7 +112,7 @@ function handleAliasReference({
   parsedValue,
   aliasOf,
   sourceName,
-  getTokenCollection,
+  tokenSources,
   tokenOutputPaths,
   preserveReferences,
 }: HandleAliasReferenceOptions): void {
@@ -112,18 +122,41 @@ function handleAliasReference({
 
   // Normalize aliasOf to remove $root for lookups (terrazzo uses normalized IDs)
   const normalizedAliasOf = aliasOf.replace(/\.\$root\b/g, '');
-  const targetCollection = getTokenCollection(normalizedAliasOf);
   // Get target's output path, or normalize $root -> root in the original aliasOf
   const targetOutputPath = tokenOutputPaths.get(normalizedAliasOf) ?? normalizeRootInPath(aliasOf);
 
-  if (targetCollection === sourceName) {
-    // Same file reference: use curly brace syntax with output path
+  // Find the target token's sources, handling split sub-tokens by looking up parent
+  let targetSources = tokenSources.get(normalizedAliasOf);
+  if (!targetSources) {
+    // Try parent tokens for split sub-tokens (e.g., "typography.heading.fontFamily")
+    const parts = normalizedAliasOf.split('.');
+    while (parts.length > 1 && !targetSources) {
+      parts.pop();
+      targetSources = tokenSources.get(parts.join('.'));
+    }
+  }
+
+  if (!targetSources?.length) {
+    // Target token not found in any source - leave value as-is
+    return;
+  }
+
+  // Check if target exists in current source (same-file reference)
+  const inCurrentSource = targetSources.some((s) => s.source === sourceName);
+  if (inCurrentSource) {
+    // Same file reference: use curly brace syntax
     parsedValue.$value = `{${targetOutputPath}}`;
-  } else if (targetCollection) {
-    // Cross-file reference: use resolved value + aliasData with output path
+    return;
+  }
+
+  // Check for SET sources only (not modifier contexts)
+  // We never want to reference other modifier contexts (e.g., dark shouldn't reference light)
+  const setSource = targetSources.find((s) => !s.isModifier);
+  if (setSource) {
+    // Cross-file reference to a set: use resolved value + aliasData
     const extensions = (parsedValue.$extensions ?? {}) as Record<string, unknown>;
     extensions['com.figma.aliasData'] = {
-      targetVariableSetName: targetCollection,
+      targetVariableSetName: setSource.source,
       targetVariableName: toFigmaVariableName(targetOutputPath),
     };
     parsedValue.$extensions = extensions;
@@ -238,7 +271,6 @@ export default function buildFigmaJson({
   const resolverSource = resolver!.source!;
 
   // Track which tokens belong to which sources (a token can appear in multiple contexts)
-  type SourceInfo = { source: string; isModifier: boolean; modifierName?: string; contextName?: string };
   const tokenSources = new Map<string, SourceInfo[]>();
 
   // Track the output path for each token ID (to preserve $root in output)
@@ -254,32 +286,6 @@ export default function buildFigmaJson({
     if (!tokenOutputPaths.has(tokenId)) {
       tokenOutputPaths.set(tokenId, outputPath);
     }
-  }
-
-  // Helper to get the primary collection name for a token (prefers set over modifier)
-  // Also handles split sub-token IDs by looking up the parent token
-  function getTokenCollection(tokenId: string): string | undefined {
-    const sources = tokenSources.get(tokenId);
-    if (sources?.length) {
-      // Prefer set source over modifier source
-      const setSource = sources.find((s) => !s.isModifier);
-      return setSource?.source ?? sources[0]?.source;
-    }
-
-    // If not found, this might be a split sub-token ID (e.g., "typography.text.primary.$root.fontFamily")
-    // Try to find the parent token by progressively removing the last segment
-    const parts = tokenId.split('.');
-    while (parts.length > 1) {
-      parts.pop();
-      const parentId = parts.join('.');
-      const parentSources = tokenSources.get(parentId);
-      if (parentSources?.length) {
-        const setSource = parentSources.find((s) => !s.isModifier);
-        return setSource?.source ?? parentSources[0]?.source;
-      }
-    }
-
-    return undefined;
   }
 
   // Process sets - these tokens always appear in their set file
@@ -391,7 +397,7 @@ export default function buildFigmaJson({
         parsedValue,
         aliasOf,
         sourceName,
-        getTokenCollection,
+        tokenSources,
         tokenOutputPaths,
         preserveReferences,
       });
@@ -461,7 +467,7 @@ export default function buildFigmaJson({
           parsedValue,
           aliasOf,
           sourceName: contextKey,
-          getTokenCollection,
+          tokenSources,
           tokenOutputPaths,
           preserveReferences,
         });
