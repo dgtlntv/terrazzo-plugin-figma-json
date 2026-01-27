@@ -7,8 +7,22 @@ import { convertNumber } from './number.js';
 
 /**
  * Get the correct alias reference for a typography sub-property.
- * If the referenced token is also a typography token (which gets split),
- * append the property name to create the correct sub-token reference.
+ * When a typography property references another typography token,
+ * the alias needs to point to the corresponding sub-token.
+ *
+ * @param aliasOf - The referenced token ID, or undefined if not an alias
+ * @param propertyName - The sub-property name (fontFamily, fontSize, etc.)
+ * @param allTokens - Map of all tokens for type lookup
+ * @returns Adjusted alias target, or undefined if not an alias
+ *
+ * @example
+ * // If typography.base is a typography token:
+ * getSubTokenAlias("typography.base", "fontFamily", tokens)
+ * // "typography.base.fontFamily"
+ *
+ * // If dimension.100 is a primitive:
+ * getSubTokenAlias("dimension.100", "fontSize", tokens)
+ * // "dimension.100" (unchanged)
  */
 function getSubTokenAlias(
   aliasOf: string | undefined,

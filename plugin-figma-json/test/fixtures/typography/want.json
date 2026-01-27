@@ -1,0 +1,10 @@
+{
+  "font": {
+    "family": {
+      "primary": {
+        "$type": "fontFamily",
+        "$value": "Inter"
+      }
+    }
+  }
+}

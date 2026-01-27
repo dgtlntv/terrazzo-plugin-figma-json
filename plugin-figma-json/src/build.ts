@@ -1,25 +1,33 @@
 import type { BuildHookOptions, Resolver } from '@terrazzo/parser';
 import wcmatch from 'wildcard-match';
-import { type FigmaJsonPluginOptions, FORMAT_ID } from './lib.js';
+import {
+  buildDefaultInput,
+  type FigmaJsonPluginOptions,
+  FORMAT_ID,
+  hasValidResolverConfig,
+  removeInternalMetadata,
+} from './lib.js';
 
 export interface BuildOptions {
   exclude: FigmaJsonPluginOptions['exclude'];
   tokenName?: FigmaJsonPluginOptions['tokenName'];
   getTransforms: BuildHookOptions['getTransforms'];
-  splitByResolver?: FigmaJsonPluginOptions['splitByResolver'];
   preserveReferences?: FigmaJsonPluginOptions['preserveReferences'];
   resolver?: Resolver;
 }
 
-export interface BuildResult {
-  /** Single output when splitting is disabled */
-  single?: string;
-  /** Multiple outputs when splitting is enabled, keyed by output name */
-  split?: Map<string, string>;
-}
-
 /**
  * Set a nested property on an object using dot-notation path.
+ * Creates intermediate objects as needed.
+ *
+ * @param obj - The object to modify
+ * @param path - Dot-notation path (e.g., "color.primary.base")
+ * @param value - The value to set at the path
+ *
+ * @example
+ * const obj = {};
+ * setNestedProperty(obj, "color.primary", { $value: "#ff0000" });
+ * // obj = { color: { primary: { $value: "#ff0000" } } }
  */
 function setNestedProperty(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split('.');
@@ -39,7 +47,13 @@ function setNestedProperty(obj: Record<string, unknown>, path: string, value: un
 
 /**
  * Convert a dot-notation token ID to Figma's slash notation.
- * E.g., "dimension.200" -> "dimension/200"
+ *
+ * @param tokenId - Token ID in dot notation
+ * @returns Token ID in slash notation for Figma
+ *
+ * @example
+ * toFigmaVariableName("dimension.200") // "dimension/200"
+ * toFigmaVariableName("color.primary.base") // "color/primary/base"
  */
 function toFigmaVariableName(tokenId: string): string {
   return tokenId.replace(/\./g, '/');
@@ -47,10 +61,73 @@ function toFigmaVariableName(tokenId: string): string {
 
 /**
  * Convert $root in a token ID to root for Figma compatibility.
- * E.g., "color.border.warning.$root" -> "color.border.warning.root"
+ * DTCG uses $root for default values, but Figma doesn't support $ in names.
+ *
+ * @param path - Token path that may contain $root
+ * @returns Path with $root replaced by root
+ *
+ * @example
+ * normalizeRootInPath("color.border.warning.$root") // "color.border.warning.root"
+ * normalizeRootInPath("color.primary") // "color.primary" (unchanged)
  */
 function normalizeRootInPath(path: string): string {
   return path.replace(/\.\$root\b/g, '.root');
+}
+
+interface HandleAliasReferenceOptions {
+  parsedValue: Record<string, unknown>;
+  aliasOf: string;
+  sourceName: string;
+  getTokenCollection: (tokenId: string) => string | undefined;
+  tokenOutputPaths: Map<string, string>;
+  preserveReferences: boolean;
+}
+
+/**
+ * Handle alias references by setting the appropriate $value or $extensions.
+ * Mutates parsedValue in place.
+ *
+ * - Same-file references: Sets $value to curly brace syntax (e.g., "{color.primary}")
+ * - Cross-file references: Keeps resolved $value and adds com.figma.aliasData extension
+ *
+ * @param options - Configuration for alias handling
+ * @param options.parsedValue - Token value object to modify (mutated)
+ * @param options.aliasOf - Target token ID this token references
+ * @param options.sourceName - Name of the current output file/collection
+ * @param options.getTokenCollection - Function to look up a token's collection
+ * @param options.tokenOutputPaths - Map of token IDs to their output paths
+ * @param options.preserveReferences - Whether to preserve references (false = no-op)
+ */
+function handleAliasReference({
+  parsedValue,
+  aliasOf,
+  sourceName,
+  getTokenCollection,
+  tokenOutputPaths,
+  preserveReferences,
+}: HandleAliasReferenceOptions): void {
+  if (!preserveReferences || !aliasOf) {
+    return;
+  }
+
+  // Normalize aliasOf to remove $root for lookups (terrazzo uses normalized IDs)
+  const normalizedAliasOf = aliasOf.replace(/\.\$root\b/g, '');
+  const targetCollection = getTokenCollection(normalizedAliasOf);
+  // Get target's output path, or normalize $root -> root in the original aliasOf
+  const targetOutputPath = tokenOutputPaths.get(normalizedAliasOf) ?? normalizeRootInPath(aliasOf);
+
+  if (targetCollection === sourceName) {
+    // Same file reference: use curly brace syntax with output path
+    parsedValue.$value = `{${targetOutputPath}}`;
+  } else if (targetCollection) {
+    // Cross-file reference: use resolved value + aliasData with output path
+    const extensions = (parsedValue.$extensions ?? {}) as Record<string, unknown>;
+    extensions['com.figma.aliasData'] = {
+      targetVariableSetName: targetCollection,
+      targetVariableName: toFigmaVariableName(targetOutputPath),
+    };
+    parsedValue.$extensions = extensions;
+  }
 }
 
 /**
@@ -66,8 +143,18 @@ interface TokenIdInfo {
 /**
  * Extract token IDs from a resolver group (token definitions).
  * Recursively walks the group structure to find all token IDs.
- * Handles $root tokens by mapping them to their parent ID (per DTCG spec)
- * while using "root" (without $) in the output path for Figma compatibility.
+ *
+ * Handles $root tokens specially per DTCG spec:
+ * - Token ID uses parent path (e.g., "color.primary" for "color.primary.$root")
+ * - Output path uses "root" without $ for Figma compatibility
+ *
+ * @param group - Object containing token definitions or nested groups
+ * @param prefix - Current path prefix for recursion
+ * @returns Array of token ID info with both normalized ID and output path
+ *
+ * @example
+ * extractTokenIds({ color: { primary: { $value: "#ff0000" } } })
+ * // [{ id: "color.primary", outputPath: "color.primary" }]
  */
 function extractTokenIds(group: Record<string, unknown>, prefix = ''): TokenIdInfo[] {
   const ids: TokenIdInfo[] = [];
@@ -103,42 +190,52 @@ function extractTokenIds(group: Record<string, unknown>, prefix = ''): TokenIdIn
   return ids;
 }
 
-/**
- * Build default input from resolver's modifiers.
- */
-function buildDefaultInput(resolverSource: NonNullable<Resolver['source']>): Record<string, string> {
-  const input: Record<string, string> = {};
-  if (resolverSource.modifiers) {
-    for (const [modifierName, modifier] of Object.entries(resolverSource.modifiers)) {
-      if (modifier.default) {
-        input[modifierName] = modifier.default;
-      }
-    }
-  }
-  return input;
-}
 
 /**
  * Build the Figma-compatible JSON output from transformed tokens.
  * Requires a resolver file - legacy mode is not supported.
+ * Always returns output split by resolver structure (sets and modifier contexts).
+ *
+ * @returns Map of output name to JSON string (e.g., "primitive" -> "{...}")
  */
 export default function buildFigmaJson({
   getTransforms,
   exclude,
   tokenName,
-  splitByResolver,
   preserveReferences = true,
   resolver,
-}: BuildOptions): BuildResult {
+}: BuildOptions): Map<string, string> {
   // Create exclude matcher
   const shouldExclude = exclude?.length ? wcmatch(exclude) : () => false;
 
-  // Require resolver
-  if (!resolver?.source || !resolver.listPermutations) {
-    return splitByResolver ? { split: new Map() } : { single: JSON.stringify({}, null, 2) };
+  // When no valid resolver config, fall back to single output under "default" key
+  if (!hasValidResolverConfig(resolver)) {
+    // Get all transforms without resolver context
+    const transforms = getTransforms({ format: FORMAT_ID });
+    if (transforms.length === 0) {
+      return new Map();
+    }
+
+    const output: Record<string, unknown> = {};
+    for (const transform of transforms) {
+      if (!transform.token) continue;
+
+      const tokenId = transform.token.id;
+      if (shouldExclude(tokenId)) continue;
+
+      const outputName = tokenName?.(transform.token) ?? tokenId;
+      const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
+
+      removeInternalMetadata(parsedValue);
+      setNestedProperty(output, outputName, parsedValue);
+    }
+
+    const result = new Map<string, string>();
+    result.set('default', JSON.stringify(output, null, 2));
+    return result;
   }
 
-  const resolverSource = resolver.source;
+  const resolverSource = resolver!.source!;
 
   // Track which tokens belong to which sources (a token can appear in multiple contexts)
   type SourceInfo = { source: string; isModifier: boolean; modifierName?: string; contextName?: string };
@@ -289,32 +386,18 @@ export default function buildFigmaJson({
     // Get aliasOf from the transformed value or token (already set above)
 
     // Handle alias references based on preserveReferences setting
-    if (preserveReferences && aliasOf) {
-      // Normalize aliasOf to remove $root for lookups (terrazzo uses normalized IDs)
-      const normalizedAliasOf = aliasOf.replace(/\.\$root\b/g, '');
-      const targetCollection = getTokenCollection(normalizedAliasOf);
-      // Get target's output path, or normalize $root -> root in the original aliasOf
-      const targetOutputPath = tokenOutputPaths.get(normalizedAliasOf) ?? normalizeRootInPath(aliasOf);
-
-      if (targetCollection === sourceName) {
-        // Same file reference: use curly brace syntax with output path
-        parsedValue.$value = `{${targetOutputPath}}`;
-      } else if (targetCollection) {
-        // Cross-file reference: use resolved value + aliasData with output path
-        const extensions = parsedValue.$extensions ?? {};
-        extensions['com.figma.aliasData'] = {
-          targetVariableSetName: targetCollection,
-          targetVariableName: toFigmaVariableName(targetOutputPath),
-        };
-        parsedValue.$extensions = extensions;
-      }
+    if (aliasOf) {
+      handleAliasReference({
+        parsedValue,
+        aliasOf,
+        sourceName,
+        getTokenCollection,
+        tokenOutputPaths,
+        preserveReferences,
+      });
     }
 
-    // Remove internal metadata before output
-    delete parsedValue._aliasOf;
-    delete parsedValue._splitFrom;
-    delete parsedValue._tokenId;
-
+    removeInternalMetadata(parsedValue);
     setNestedProperty(outputBySource.get(sourceName)!, outputName, parsedValue);
   }
 
@@ -373,49 +456,26 @@ export default function buildFigmaJson({
       const aliasOf = parsedValue._aliasOf ?? transform.token.aliasOf;
 
       // Handle alias references based on preserveReferences setting
-      if (preserveReferences && aliasOf) {
-        // Normalize aliasOf to remove $root for lookups (terrazzo uses normalized IDs)
-        const normalizedAliasOf = aliasOf.replace(/\.\$root\b/g, '');
-        const targetCollection = getTokenCollection(normalizedAliasOf);
-        // Get target's output path, or normalize $root -> root in the original aliasOf
-        const targetOutputPath = tokenOutputPaths.get(normalizedAliasOf) ?? normalizeRootInPath(aliasOf);
-
-        if (targetCollection === contextKey) {
-          // Same file reference: use curly brace syntax with output path
-          parsedValue.$value = `{${targetOutputPath}}`;
-        } else if (targetCollection) {
-          // Cross-file reference: use resolved value + aliasData with output path
-          const extensions = parsedValue.$extensions ?? {};
-          extensions['com.figma.aliasData'] = {
-            targetVariableSetName: targetCollection,
-            targetVariableName: toFigmaVariableName(targetOutputPath),
-          };
-          parsedValue.$extensions = extensions;
-        }
+      if (aliasOf) {
+        handleAliasReference({
+          parsedValue,
+          aliasOf,
+          sourceName: contextKey,
+          getTokenCollection,
+          tokenOutputPaths,
+          preserveReferences,
+        });
       }
 
-      // Remove internal metadata before output
-      delete parsedValue._aliasOf;
-      delete parsedValue._splitFrom;
-      delete parsedValue._tokenId;
-
+      removeInternalMetadata(parsedValue);
       setNestedProperty(outputBySource.get(contextKey)!, outputName, parsedValue);
     }
   }
 
-  // Return split or single output
-  if (splitByResolver) {
-    const result = new Map<string, string>();
-    for (const [sourceName, output] of outputBySource) {
-      result.set(sourceName, JSON.stringify(output, null, 2));
-    }
-    return { split: result };
+  // Return split output by source
+  const result = new Map<string, string>();
+  for (const [sourceName, output] of outputBySource) {
+    result.set(sourceName, JSON.stringify(output, null, 2));
   }
-
-  // Single file: merge all outputs
-  const merged: Record<string, unknown> = {};
-  for (const output of outputBySource.values()) {
-    Object.assign(merged, output);
-  }
-  return { single: JSON.stringify(merged, null, 2) };
+  return result;
 }

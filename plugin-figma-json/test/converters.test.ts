@@ -6,6 +6,7 @@ import { convertFontFamily } from '../src/converters/font-family.js';
 import { convertFontWeight } from '../src/converters/font-weight.js';
 import { convertNumber } from '../src/converters/number.js';
 import { convertTypography } from '../src/converters/typography.js';
+import type { TokenNormalized } from '@terrazzo/parser';
 import type { ConverterContext } from '../src/lib.js';
 
 /**
@@ -581,8 +582,8 @@ describe('convertTypography', () => {
         fontSize: 'dimension.size.100',
       },
       allTokens: {
-        'typography.fontFamily.sansSerif': { $type: 'fontFamily' },
-        'dimension.size.100': { $type: 'dimension' },
+        'typography.fontFamily.sansSerif': { $type: 'fontFamily' } as TokenNormalized,
+        'dimension.size.100': { $type: 'dimension' } as TokenNormalized,
       },
     });
     const result = convertTypography(
@@ -609,7 +610,7 @@ describe('convertTypography', () => {
         lineHeight: 'typography.base',
       },
       allTokens: {
-        'typography.base': { $type: 'typography' },
+        'typography.base': { $type: 'typography' } as TokenNormalized,
       },
     });
     const result = convertTypography(
@@ -639,9 +640,9 @@ describe('convertTypography', () => {
         fontWeight: 'typography.weight.bold', // primitive (fontWeight type)
       },
       allTokens: {
-        'typography.base': { $type: 'typography' },
-        'dimension.size.100': { $type: 'dimension' },
-        'typography.weight.bold': { $type: 'fontWeight' },
+        'typography.base': { $type: 'typography' } as TokenNormalized,
+        'dimension.size.100': { $type: 'dimension' } as TokenNormalized,
+        'typography.weight.bold': { $type: 'fontWeight' } as TokenNormalized,
       },
     });
     const result = convertTypography(

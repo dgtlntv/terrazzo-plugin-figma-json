@@ -34,40 +34,33 @@ Run the Terrazzo build:
 npx tz build
 ```
 
-The plugin will generate a `tokens.figma.json` file that can be imported directly into Figma.
-
 ## Configuration Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `filename` | `string` | `"tokens.figma.json"` | Output filename for the Figma-compatible JSON (used as suffix when `splitBySource` is enabled) |
+| `filename` | `string` | `"tokens.figma.json"` | Output filename (used as suffix when using resolver) |
 | `exclude` | `string[]` | `[]` | Glob patterns to exclude tokens from output |
 | `transform` | `(token) => unknown` | `undefined` | Custom transform function to override token values |
 | `tokenName` | `(token) => string` | `undefined` | Custom function to control token names in output |
 | `skipBuild` | `boolean` | `false` | Skip generating the output file |
 | `remBasePx` | `number` | `16` | Base pixel value for rem to px conversion |
 | `warnOnUnsupported` | `boolean` | `true` | Log warnings for unsupported token types |
-| `splitBySource` | `boolean` | `false` | Split output into multiple files matching input file structure |
+| `preserveReferences` | `boolean` | `true` | Preserve token aliases in output (see [Alias Handling](#alias-handling)) |
 
-### Example with Options
+## Output Structure
 
-```typescript
-import { defineConfig } from "@terrazzo/cli";
-import figmaJson from "terrazzo-plugin-figma-json";
+When using a resolver file (recommended), the plugin automatically splits output by resolver sets and modifier contexts:
 
-export default defineConfig({
-  outDir: "./tokens/",
-  plugins: [
-    figmaJson({
-      filename: "design-tokens.figma.json",
-      exclude: ["internal.*", "deprecated.*"],
-      remBasePx: 16,
-      warnOnUnsupported: true,
-      tokenName: (token) => token.id.replace("color.", "brand."),
-    }),
-  ],
-});
 ```
+dist/
+├── primitive.figma.json       # From "primitive" set
+├── semantic.figma.json        # From "semantic" set
+├── colorScheme-light.figma.json
+├── colorScheme-dark.figma.json
+└── breakpoint-small.figma.json
+```
+
+Without a resolver, all tokens are output to a single file.
 
 ## Supported Token Types
 
@@ -78,37 +71,102 @@ export default defineConfig({
 | `duration` | Number | `s` values pass through; `ms` converted to `s` |
 | `fontFamily` | String | Strings pass through; arrays truncated to first element |
 | `fontWeight` | Number or String | Values pass through with validation |
-| `number` | Number or Boolean | Numbers pass through; use `com.figma.type: "boolean"` extension for booleans |
+| `number` | Number or Boolean | Numbers pass through; use `com.figma.type: "boolean"` for booleans |
+| `typography` | Split tokens | Split into fontFamily, fontSize, fontWeight, lineHeight, letterSpacing |
+
+### Typography Token Splitting
+
+Figma doesn't support composite typography tokens, so they're automatically split into individual sub-tokens:
+
+**Input:**
+```json
+{
+  "typography": {
+    "$type": "typography",
+    "heading": {
+      "$value": {
+        "fontFamily": "Inter",
+        "fontSize": { "value": 24, "unit": "px" },
+        "fontWeight": 700,
+        "lineHeight": 1.2,
+        "letterSpacing": { "value": 0, "unit": "px" }
+      }
+    }
+  }
+}
+```
+
+**Output:**
+```json
+{
+  "typography": {
+    "heading": {
+      "fontFamily": { "$type": "fontFamily", "$value": "Inter" },
+      "fontSize": { "$type": "dimension", "$value": { "value": 24, "unit": "px" } },
+      "fontWeight": { "$type": "fontWeight", "$value": 700 },
+      "lineHeight": { "$type": "number", "$value": 1.2 },
+      "letterSpacing": { "$type": "dimension", "$value": { "value": 0, "unit": "px" } }
+    }
+  }
+}
+```
 
 ## Unsupported Token Types
 
 The following DTCG token types are **not supported** by Figma and will be skipped:
 
-- `shadow`
-- `border`
-- `gradient`
-- `typography`
-- `transition`
-- `strokeStyle`
-- `cubicBezier`
+- `shadow`, `border`, `gradient`, `transition`, `strokeStyle`, `cubicBezier`
 
-When a token with an unsupported type is encountered, it will be excluded from the output and a warning will be logged (unless `warnOnUnsupported: false`).
+## Alias Handling
+
+When `preserveReferences: true` (default):
+
+- **Same-file references**: Use curly brace syntax in `$value` (e.g., `"{color.primary}"`)
+- **Cross-file references**: Use resolved `$value` + `com.figma.aliasData` extension
+
+```json
+{
+  "color": {
+    "brand": {
+      "$type": "color",
+      "$value": "{color.palette.blue.500}"
+    }
+  }
+}
+```
+
+For cross-collection aliases (referencing tokens in a different output file):
+
+```json
+{
+  "color": {
+    "text": {
+      "$type": "color",
+      "$value": { "colorSpace": "srgb", "components": [0.2, 0.4, 0.8], "alpha": 1 },
+      "$extensions": {
+        "com.figma.aliasData": {
+          "targetVariableSetName": "primitive",
+          "targetVariableName": "color/palette/blue/500"
+        }
+      }
+    }
+  }
+}
+```
 
 ## Color Space Conversion
 
-Figma only supports **sRGB** and **HSL** color spaces. This plugin automatically converts colors from other color spaces to sRGB:
+Figma only supports **sRGB** and **HSL** color spaces. Other color spaces are converted to sRGB:
 
-- sRGB, HSL: Pass through unchanged
-- Display P3, Rec2020, A98 RGB, ProPhoto RGB: Converted to sRGB
-- OKLCH, OkLab, Lab, LCH: Converted to sRGB
-- XYZ-D65, XYZ-D50: Converted to sRGB
-- HWB, sRGB-linear: Converted to sRGB
+- Display P3, Rec2020, A98 RGB, ProPhoto RGB → sRGB
+- OKLCH, OkLab, Lab, LCH → sRGB
+- XYZ-D65, XYZ-D50, HWB, sRGB-linear → sRGB
 
-Colors that fall outside the sRGB gamut will be clipped, and a warning will be logged.
+Colors outside the sRGB gamut will be clipped with a warning.
 
 ## Boolean Tokens
 
-Figma supports boolean variables. To create a boolean token, use the `number` type with the `com.figma.type` extension:
+Use the `number` type with the `com.figma.type` extension:
 
 ```json
 {
@@ -116,160 +174,45 @@ Figma supports boolean variables. To create a boolean token, use the `number` ty
     "$type": "number",
     "dark-mode-enabled": {
       "$value": 1,
-      "$extensions": {
-        "com.figma.type": "boolean"
-      }
+      "$extensions": { "com.figma.type": "boolean" }
     }
   }
 }
 ```
 
-This will output as a boolean value:
-- `0` becomes `false`
-- Any non-zero number becomes `true`
+- `0` → `false`
+- Non-zero → `true`
 
 ## Examples
 
-### Basic Color Tokens
-
-**Input (DTCG):**
-```json
-{
-  "color": {
-    "$type": "color",
-    "primary": {
-      "$value": {
-        "colorSpace": "srgb",
-        "components": [0.2, 0.4, 0.8]
-      },
-      "$description": "Primary brand color"
-    }
-  }
-}
-```
-
-**Output (Figma JSON):**
-```json
-{
-  "color": {
-    "primary": {
-      "$type": "color",
-      "$value": {
-        "colorSpace": "srgb",
-        "components": [0.2, 0.4, 0.8],
-        "alpha": 1
-      },
-      "$description": "Primary brand color"
-    }
-  }
-}
-```
-
-### Dimension Tokens with rem Conversion
-
-**Input (DTCG):**
-```json
-{
-  "spacing": {
-    "$type": "dimension",
-    "small": { "$value": { "value": 8, "unit": "px" } },
-    "large": { "$value": { "value": 1.5, "unit": "rem" } }
-  }
-}
-```
-
-**Output (Figma JSON):**
-```json
-{
-  "spacing": {
-    "small": {
-      "$type": "dimension",
-      "$value": { "value": 8, "unit": "px" }
-    },
-    "large": {
-      "$type": "dimension",
-      "$value": { "value": 24, "unit": "px" }
-    }
-  }
-}
-```
-
 ### Excluding Tokens
-
-Use the `exclude` option to filter out specific tokens:
 
 ```typescript
 figmaJson({
   exclude: [
-    "internal.*",      // Exclude all tokens under "internal" group
-    "*.deprecated.*",  // Exclude tokens with "deprecated" in the path
-    "color.*.dark",    // Exclude dark mode color variants
+    "internal.*",      // Exclude "internal" group
+    "*.deprecated.*",  // Exclude "deprecated" tokens
   ],
 })
 ```
 
 ### Custom Token Names
 
-Use the `tokenName` option to transform token names in the output:
-
 ```typescript
 figmaJson({
-  tokenName: (token) => {
-    // Add prefix to color tokens
-    if (token.id.startsWith("color.")) {
-      return token.id.replace("color.", "brand.color.");
-    }
-    return token.id;
-  },
+  tokenName: (token) => token.id.replace("color.", "brand.color."),
 })
 ```
 
-### Split Output by Source File
-
-Use the `splitBySource` option to generate separate output files for each input token file:
-
-```typescript
-import { defineConfig } from "@terrazzo/cli";
-import figmaJson from "terrazzo-plugin-figma-json";
-
-export default defineConfig({
-  tokens: [
-    "./tokens/color.tokens.json",
-    "./tokens/dimension.tokens.json",
-    "./tokens/typography.tokens.json",
-  ],
-  outDir: "./dist/",
-  plugins: [
-    figmaJson({
-      filename: "figma.json",  // Used as suffix
-      splitBySource: true,
-    }),
-  ],
-});
-```
-
-This generates:
-- `dist/color.figma.json` (from `color.tokens.json`)
-- `dist/dimension.figma.json` (from `dimension.tokens.json`)
-- `dist/typography.figma.json` (from `typography.tokens.json`)
-
 ### Custom Transform
-
-Use the `transform` option to override specific token values:
 
 ```typescript
 figmaJson({
   transform: (token) => {
-    // Override a specific token
     if (token.id === "color.special") {
-      return {
-        colorSpace: "srgb",
-        components: [1, 0, 0],
-        alpha: 1,
-      };
+      return { colorSpace: "srgb", components: [1, 0, 0], alpha: 1 };
     }
-    // Return undefined to use default transformation
-    return undefined;
+    return undefined; // Use default transformation
   },
 })
 ```

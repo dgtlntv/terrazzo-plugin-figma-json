@@ -36,15 +36,9 @@ export * from './transform.js';
  *   },
  * });
  *
- * @example
- * // Split output by resolver structure (sets and modifier contexts)
- * figmaJson({
- *   splitByResolver: true,
- *   filename: "figma.json", // Used as suffix: "primitive" -> "primitive.figma.json"
- * });
  */
 export default function figmaJsonPlugin(options?: FigmaJsonPluginOptions): Plugin {
-  const { skipBuild, splitByResolver } = options ?? {};
+  const { skipBuild } = options ?? {};
   const filename = options?.filename ?? 'tokens.figma.json';
 
   return {
@@ -72,21 +66,15 @@ export default function figmaJsonPlugin(options?: FigmaJsonPluginOptions): Plugi
         getTransforms,
         exclude: options?.exclude,
         tokenName: options?.tokenName,
-        splitByResolver,
         preserveReferences: options?.preserveReferences,
         resolver,
       });
 
-      if (result.split) {
-        // Output multiple files based on resolver structure
-        for (const [sourceName, contents] of result.split) {
-          // sourceName is like "primitive" or "breakpoint-small"
-          const outputName = `${sourceName}.${filename}`;
-          outputFile(outputName, contents);
-        }
-      } else if (result.single) {
-        // Single file output
-        outputFile(filename, result.single);
+      // Output multiple files based on resolver structure
+      for (const [sourceName, contents] of result) {
+        // sourceName is like "primitive" or "breakpoint-small" or "default" (when no resolver)
+        const outputName = sourceName === 'default' ? filename : `${sourceName}.${filename}`;
+        outputFile(outputName, contents);
       }
     },
   };

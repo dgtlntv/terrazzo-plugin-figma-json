@@ -9,8 +9,11 @@ import { FIGMA_COLOR_SPACES, PLUGIN_NAME } from '../lib.js';
 const COLOR_PRECISION = 6;
 
 /**
- * Round a number to specified decimal places and clamp to [0, 1] range.
- * This prevents floating-point precision issues like 1.0000000000000007.
+ * Round a number to COLOR_PRECISION decimal places and clamp to [0, 1] range.
+ * Prevents floating-point precision issues (e.g., 1.0000000000000007 -> 1).
+ *
+ * @param value - Color component value (typically 0-1 for sRGB)
+ * @returns Rounded and clamped value in [0, 1] range
  */
 function roundAndClamp(value: number): number {
   const rounded = Math.round(value * 10 ** COLOR_PRECISION) / 10 ** COLOR_PRECISION;
@@ -19,6 +22,10 @@ function roundAndClamp(value: number): number {
 
 /**
  * Normalize color components: round to precision and clamp to valid range.
+ * Applies roundAndClamp to each component in the RGB/HSL triplet.
+ *
+ * @param components - Array of 3 color component values
+ * @returns Normalized triplet with values rounded and clamped
  */
 function normalizeComponents(components: [number, number, number]): [number, number, number] {
   return components.map(roundAndClamp) as [number, number, number];

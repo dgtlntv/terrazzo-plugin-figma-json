@@ -291,4 +291,97 @@ describe('edge cases', () => {
     // Terrazzo normalizes colors to include alpha=1
     expect(parsed.color.solid.$value.alpha).toBe(1);
   });
+
+  it('resolves alias references in fallback mode (no resolver)', async () => {
+    // Without a resolver file, references are always resolved since there's no
+    // concept of "same-file" vs "cross-file" references
+    const tokens = {
+      color: {
+        $type: 'color',
+        primary: {
+          $value: { colorSpace: 'srgb', components: [0.2, 0.4, 0.8] },
+        },
+        secondary: {
+          $value: '{color.primary}',
+        },
+      },
+    };
+
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
+    const parsed = JSON.parse(contents ?? '{}');
+
+    // In fallback mode, references are resolved to their values
+    expect(parsed.color.secondary.$value.colorSpace).toBe('srgb');
+    expect(parsed.color.secondary.$value.components).toEqual([0.2, 0.4, 0.8]);
+  });
+
+  it('resolves dimension references in fallback mode', async () => {
+    const tokens = {
+      dimension: {
+        $type: 'dimension',
+        base: {
+          $value: { value: 16, unit: 'px' },
+        },
+        large: {
+          $value: '{dimension.base}',
+        },
+      },
+    };
+
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
+    const parsed = JSON.parse(contents ?? '{}');
+
+    // In fallback mode, references are resolved
+    expect(parsed.dimension.large.$value).toEqual({ value: 16, unit: 'px' });
+  });
+
+  // Note: Typography token splitting is tested in test/index.test.ts with the typography fixture
+  // which has proper letterSpacing values that pass validation
+
+  it('handles fontWeight with named values', async () => {
+    const tokens = {
+      font: {
+        weight: {
+          $type: 'fontWeight',
+          bold: {
+            $value: 'bold',
+          },
+          light: {
+            $value: 'light',
+          },
+        },
+      },
+    };
+
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
+    const parsed = JSON.parse(contents ?? '{}');
+
+    // Named font weights should be converted to numbers
+    expect(parsed.font.weight.bold.$value).toBe(700);
+    expect(parsed.font.weight.light.$value).toBe(300);
+  });
+
+  it('filters out non-Figma extensions', async () => {
+    const tokens = {
+      color: {
+        $type: 'color',
+        primary: {
+          $value: { colorSpace: 'srgb', components: [0.2, 0.4, 0.8] },
+          $extensions: {
+            'com.figma.type': 'color',
+            'com.custom.metadata': 'should be removed',
+            'other.extension': 'also removed',
+          },
+        },
+      },
+    };
+
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
+    const parsed = JSON.parse(contents ?? '{}');
+
+    // Only com.figma.* extensions should be preserved
+    expect(parsed.color.primary.$extensions?.['com.figma.type']).toBe('color');
+    expect(parsed.color.primary.$extensions?.['com.custom.metadata']).toBeUndefined();
+    expect(parsed.color.primary.$extensions?.['other.extension']).toBeUndefined();
+  });
 });

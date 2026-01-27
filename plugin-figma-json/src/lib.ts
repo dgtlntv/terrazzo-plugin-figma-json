@@ -1,6 +1,65 @@
-import type { Logger, TokenNormalized } from '@terrazzo/parser';
+import type { Logger, Resolver, TokenNormalized } from '@terrazzo/parser';
 
 export const PLUGIN_NAME = 'terrazzo-plugin-figma-json';
+
+/**
+ * Check if the resolver has a usable configuration.
+ * Terrazzo creates a default resolver even without a resolver file,
+ * but it has empty contexts that cause errors when used.
+ *
+ * @param resolver - The resolver from terrazzo parser
+ * @returns true if resolver has user-defined sets or modifiers with contexts
+ */
+export function hasValidResolverConfig(resolver: Resolver | undefined): boolean {
+  if (!resolver?.source || !resolver.listPermutations) {
+    return false;
+  }
+
+  // Check if there are any user-defined sets (not just allTokens) or
+  // modifiers with actual contexts
+  const source = resolver.source;
+  const sets = source.sets ?? {};
+  const modifiers = source.modifiers ?? {};
+
+  // Check if any set other than allTokens exists, or if any modifier has contexts
+  const hasUserSets = Object.keys(sets).some((name) => name !== 'allTokens');
+  const hasModifierContexts = Object.values(modifiers).some(
+    (mod) => mod.contexts && Object.keys(mod.contexts).length > 0
+  );
+
+  return hasUserSets || hasModifierContexts;
+}
+
+/**
+ * Build default input from resolver's modifiers.
+ * Creates an input object with each modifier set to its default value.
+ *
+ * @param resolverSource - The resolver source configuration
+ * @returns Input object for resolver.apply() with default modifier values
+ */
+export function buildDefaultInput(resolverSource: NonNullable<Resolver['source']>): Record<string, string> {
+  const input: Record<string, string> = {};
+  if (resolverSource.modifiers) {
+    for (const [modifierName, modifier] of Object.entries(resolverSource.modifiers)) {
+      if (modifier.default) {
+        input[modifierName] = modifier.default;
+      }
+    }
+  }
+  return input;
+}
+
+/**
+ * Remove internal metadata properties from a parsed token value.
+ * These properties are used for internal processing and should not appear in output.
+ *
+ * @param parsedValue - Token value object to clean (mutated in place)
+ */
+export function removeInternalMetadata(parsedValue: Record<string, unknown>): void {
+  delete parsedValue._aliasOf;
+  delete parsedValue._splitFrom;
+  delete parsedValue._tokenId;
+}
 
 export const FORMAT_ID = 'figma-json';
 
@@ -280,13 +339,4 @@ export interface FigmaJsonPluginOptions {
    * @default true
    */
   preserveReferences?: boolean;
-
-  /**
-   * Split output files based on resolver structure (sets and modifier contexts).
-   * When true, outputs separate files for each resolver set and each modifier context.
-   * E.g., "primitive.figma.json", "breakpoint-small.figma.json", etc.
-   * Only applies when using a resolver file as input.
-   * @default false
-   */
-  splitByResolver?: boolean;
 }

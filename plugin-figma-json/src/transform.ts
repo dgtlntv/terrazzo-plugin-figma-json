@@ -1,7 +1,24 @@
 import type { TransformHookOptions, TokenNormalized } from '@terrazzo/parser';
 import wcmatch from 'wildcard-match';
 import { convertToken } from './converters/index.js';
-import { type FigmaJsonPluginOptions, FORMAT_ID, type TokenExtensions } from './lib.js';
+import { type FigmaJsonPluginOptions, FORMAT_ID, hasValidResolverConfig, type TokenExtensions } from './lib.js';
+
+/**
+ * Register a transform with optional resolver input.
+ * Encapsulates the conditional logic for input presence.
+ */
+function registerTransform(
+  setTransform: TransformHookOptions['setTransform'],
+  id: string,
+  value: string,
+  input?: Record<string, string>
+): void {
+  if (input) {
+    setTransform(id, { format: FORMAT_ID, value, input });
+  } else {
+    setTransform(id, { format: FORMAT_ID, value });
+  }
+}
 
 export interface TransformOptions {
   transform: TransformHookOptions;
@@ -10,7 +27,14 @@ export interface TransformOptions {
 
 /**
  * Filter extensions to only include Figma-specific ones (com.figma.*).
- * Returns undefined if no Figma extensions exist.
+ * Removes non-Figma extensions to keep output clean.
+ *
+ * @param extensions - Token extensions object that may include various namespaces
+ * @returns Object with only com.figma.* keys, or undefined if none exist
+ *
+ * @example
+ * filterFigmaExtensions({ "com.figma.type": "boolean", "custom.ext": "value" })
+ * // { "com.figma.type": "boolean" }
  */
 function filterFigmaExtensions(extensions: TokenExtensions | undefined): TokenExtensions | undefined {
   if (!extensions) return undefined;
@@ -29,7 +53,17 @@ function filterFigmaExtensions(extensions: TokenExtensions | undefined): TokenEx
 }
 
 /**
- * Transform a single token and call setTransform.
+ * Transform a single token and register it via setTransform.
+ * Handles custom transforms, split tokens (typography), and alias references.
+ *
+ * @param token - The normalized token from terrazzo parser
+ * @param rawValue - The resolved token value
+ * @param aliasOf - Target token ID if this is an alias, undefined otherwise
+ * @param options - Plugin configuration options
+ * @param context - Plugin hook context with logger
+ * @param allTokens - Map of all tokens for alias validation
+ * @param setTransform - Terrazzo callback to register transformed value
+ * @param input - Optional resolver input. When omitted, uses legacy mode without resolver.
  */
 function transformToken(
   token: TokenNormalized,
@@ -39,16 +73,12 @@ function transformToken(
   context: TransformHookOptions['context'],
   allTokens: Record<string, TokenNormalized>,
   setTransform: TransformHookOptions['setTransform'],
-  input: Record<string, string>
+  input?: Record<string, string>
 ): void {
   // Allow custom transform to override
   const customValue = options.transform?.(token);
   if (customValue !== undefined) {
-    setTransform(token.id, {
-      format: FORMAT_ID,
-      value: JSON.stringify(customValue),
-      input,
-    });
+    registerTransform(setTransform, token.id, JSON.stringify(customValue), input);
     return;
   }
 
@@ -92,11 +122,7 @@ function transformToken(
       if (subTokenFigmaExtensions) {
         transformedValue.$extensions = subTokenFigmaExtensions;
       }
-      setTransform(subId, {
-        format: FORMAT_ID,
-        value: JSON.stringify(transformedValue),
-        input,
-      });
+      registerTransform(setTransform, subId, JSON.stringify(transformedValue), input);
     }
     return;
   }
@@ -154,33 +180,45 @@ function transformToken(
     }
   }
 
-  setTransform(token.id, {
-    format: FORMAT_ID,
-    value: JSON.stringify(transformedValue),
-    input,
-  });
+  registerTransform(setTransform, token.id, JSON.stringify(transformedValue), input);
 }
 
 /**
  * Transform DTCG tokens into Figma-compatible format.
- * Requires a resolver file - legacy mode is not supported.
+ * Supports both resolver-based and non-resolver workflows.
  */
 export default function transformFigmaJson({ transform, options }: TransformOptions): void {
-  const { setTransform, context, resolver } = transform;
-
-  // Require resolver
-  if (!resolver?.source || !resolver.listPermutations) {
-    return;
-  }
-
-  const permutations = resolver.listPermutations();
+  const { setTransform, context, resolver, tokens } = transform;
 
   // Create exclude matcher
   const shouldExclude = options.exclude?.length ? wcmatch(options.exclude) : () => false;
 
+  // If no valid resolver config, use flat token map (fallback mode - no input)
+  if (!hasValidResolverConfig(resolver)) {
+    for (const token of Object.values(tokens)) {
+      if (shouldExclude(token.id)) {
+        continue;
+      }
+
+      transformToken(
+        token,
+        token.$value,
+        token.aliasOf,
+        options,
+        context,
+        tokens,
+        setTransform
+        // No input - uses legacy mode without resolver
+      );
+    }
+    return;
+  }
+
+  const permutations = resolver!.listPermutations();
+
   // Process each permutation (context combination)
   for (const input of permutations) {
-    const contextTokens = resolver.apply(input);
+    const contextTokens = resolver!.apply(input);
 
     for (const token of Object.values(contextTokens)) {
       if (shouldExclude(token.id)) {
