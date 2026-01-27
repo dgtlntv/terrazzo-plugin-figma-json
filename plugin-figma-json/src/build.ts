@@ -5,6 +5,7 @@ import {
   type FigmaJsonPluginOptions,
   FORMAT_ID,
   hasValidResolverConfig,
+  INTERNAL_KEYS,
   removeInternalMetadata,
 } from './lib.js';
 
@@ -31,18 +32,23 @@ export interface BuildOptions {
  */
 function setNestedProperty(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split('.');
+  if (parts.length === 0) return;
+
   let current = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i]!;
+    const part = parts[i];
+    if (part === undefined) continue;
     if (!(part in current)) {
       current[part] = {};
     }
     current = current[part] as Record<string, unknown>;
   }
 
-  const lastPart = parts[parts.length - 1]!;
-  current[lastPart] = value;
+  const lastPart = parts[parts.length - 1];
+  if (lastPart !== undefined) {
+    current[lastPart] = value;
+  }
 }
 
 /**
@@ -268,7 +274,11 @@ export default function buildFigmaJson({
     return result;
   }
 
-  const resolverSource = resolver!.source!;
+  // After hasValidResolverConfig, resolver and source are guaranteed to exist
+  const resolverSource = resolver.source;
+  if (!resolverSource) {
+    return new Map();
+  }
 
   // Track which tokens belong to which sources (a token can appear in multiple contexts)
   const tokenSources = new Map<string, SourceInfo[]>();
@@ -278,10 +288,12 @@ export default function buildFigmaJson({
 
   // Helper to add a source for a token
   function addTokenSource(tokenId: string, outputPath: string, info: SourceInfo) {
-    if (!tokenSources.has(tokenId)) {
-      tokenSources.set(tokenId, []);
+    const existing = tokenSources.get(tokenId);
+    if (existing) {
+      existing.push(info);
+    } else {
+      tokenSources.set(tokenId, [info]);
     }
-    tokenSources.get(tokenId)!.push(info);
     // Store output path (first one wins if there are duplicates)
     if (!tokenOutputPaths.has(tokenId)) {
       tokenOutputPaths.set(tokenId, outputPath);
@@ -347,7 +359,7 @@ export default function buildFigmaJson({
     const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
 
     // Handle split sub-tokens (e.g., typography.text.primary.fontFamily)
-    // These don't have a token object but have _splitFrom metadata
+    // These don't have a token object but have INTERNAL_KEYS.SPLIT_FROM metadata
     let tokenId: string;
     let outputName: string;
     let aliasOf: string | undefined;
@@ -357,13 +369,13 @@ export default function buildFigmaJson({
       tokenId = transform.token.id;
       // Use tracked output path (preserves $root) if no custom tokenName
       outputName = tokenName?.(transform.token) ?? tokenOutputPaths.get(tokenId) ?? tokenId;
-      aliasOf = parsedValue._aliasOf ?? transform.token.aliasOf;
+      aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF] ?? transform.token.aliasOf;
       sourceLookupId = tokenId;
-    } else if (parsedValue._splitFrom && parsedValue._tokenId) {
+    } else if (parsedValue[INTERNAL_KEYS.SPLIT_FROM] && parsedValue[INTERNAL_KEYS.TOKEN_ID]) {
       // Split sub-token: use parent's source
-      tokenId = parsedValue._tokenId;
+      tokenId = parsedValue[INTERNAL_KEYS.TOKEN_ID];
       // For split tokens, replace parent ID with parent's output path in the token ID
-      const parentId = parsedValue._splitFrom;
+      const parentId = parsedValue[INTERNAL_KEYS.SPLIT_FROM];
       const parentOutputPath = tokenOutputPaths.get(parentId);
       if (parentOutputPath && parentOutputPath !== parentId) {
         // Replace parent ID prefix with parent output path (to preserve $root)
@@ -371,7 +383,7 @@ export default function buildFigmaJson({
       } else {
         outputName = tokenId;
       }
-      aliasOf = parsedValue._aliasOf;
+      aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF];
       sourceLookupId = parentId; // Look up source using parent token ID
     } else {
       // Unknown transform without token - skip
@@ -385,8 +397,10 @@ export default function buildFigmaJson({
     if (!setSource) continue; // Skip tokens that aren't in a set
 
     const sourceName = setSource.source;
-    if (!outputBySource.has(sourceName)) {
-      outputBySource.set(sourceName, {});
+    let sourceOutput = outputBySource.get(sourceName);
+    if (!sourceOutput) {
+      sourceOutput = {};
+      outputBySource.set(sourceName, sourceOutput);
     }
 
     // Get aliasOf from the transformed value or token (already set above)
@@ -404,7 +418,7 @@ export default function buildFigmaJson({
     }
 
     removeInternalMetadata(parsedValue);
-    setNestedProperty(outputBySource.get(sourceName)!, outputName, parsedValue);
+    setNestedProperty(sourceOutput, outputName, parsedValue);
   }
 
   // Process modifier context tokens
@@ -416,10 +430,12 @@ export default function buildFigmaJson({
       if (!sourceInfo.isModifier) continue;
 
       const contextKey = sourceInfo.source;
-      if (!modifierTokensByContext.has(contextKey)) {
-        modifierTokensByContext.set(contextKey, new Set());
+      const existing = modifierTokensByContext.get(contextKey);
+      if (existing) {
+        existing.add(tokenId);
+      } else {
+        modifierTokensByContext.set(contextKey, new Set([tokenId]));
       }
-      modifierTokensByContext.get(contextKey)!.add(tokenId);
     }
   }
 
@@ -442,8 +458,10 @@ export default function buildFigmaJson({
     // Get transforms for this context
     const contextTransforms = getTransforms({ format: FORMAT_ID, input });
 
-    if (!outputBySource.has(contextKey)) {
-      outputBySource.set(contextKey, {});
+    let contextOutput = outputBySource.get(contextKey);
+    if (!contextOutput) {
+      contextOutput = {};
+      outputBySource.set(contextKey, contextOutput);
     }
 
     // Add tokens for this context
@@ -459,7 +477,7 @@ export default function buildFigmaJson({
       const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
 
       // Get aliasOf from the transformed value (set during transform step) or fall back to token
-      const aliasOf = parsedValue._aliasOf ?? transform.token.aliasOf;
+      const aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF] ?? transform.token.aliasOf;
 
       // Handle alias references based on preserveReferences setting
       if (aliasOf) {
@@ -474,7 +492,7 @@ export default function buildFigmaJson({
       }
 
       removeInternalMetadata(parsedValue);
-      setNestedProperty(outputBySource.get(contextKey)!, outputName, parsedValue);
+      setNestedProperty(contextOutput, outputName, parsedValue);
     }
   }
 

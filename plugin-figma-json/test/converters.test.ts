@@ -85,7 +85,8 @@ describe('convertColor', () => {
 
     expect(result.skip).toBeUndefined();
     expect(result.value).toHaveProperty('colorSpace', 'srgb');
-    expect(ctx.logger.warn).toHaveBeenCalled();
+    // Color space conversion logs at info level (expected behavior)
+    expect(ctx.logger.info).toHaveBeenCalled();
   });
 
   it('converts Lab to sRGB', () => {

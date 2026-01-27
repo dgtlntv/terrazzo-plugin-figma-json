@@ -1,5 +1,5 @@
-import type { ConverterContext, ConverterResult, DTCGDimensionValue } from '../lib.js';
-import { PLUGIN_NAME } from '../lib.js';
+import type { ConverterContext, ConverterResult } from "../lib.js"
+import { isDTCGDimensionValue, PLUGIN_NAME } from "../lib.js"
 
 /**
  * Convert a DTCG dimension value to Figma-compatible format.
@@ -15,48 +15,59 @@ import { PLUGIN_NAME } from '../lib.js';
  * convertDimension({ value: 1.5, unit: "rem" }, context);
  * // => { value: { value: 24, unit: "px" } }
  */
-export function convertDimension(value: unknown, context: ConverterContext): ConverterResult {
-  const dimension = value as DTCGDimensionValue;
+export function convertDimension(
+  value: unknown,
+  context: ConverterContext,
+): ConverterResult {
+  if (!isDTCGDimensionValue(value)) {
+    context.logger.warn({
+      group: "plugin",
+      label: PLUGIN_NAME,
+      message: `Token "${context.tokenId}" has invalid dimension value: expected object with value (number) and unit (string)`,
+    })
+    return { value: undefined, skip: true }
+  }
+  const dimension = value
 
   // Validate numeric value
   if (!Number.isFinite(dimension.value)) {
     context.logger.warn({
-      group: 'plugin',
+      group: "plugin",
       label: PLUGIN_NAME,
       message: `Token "${context.tokenId}" has invalid dimension value: ${dimension.value}`,
-    });
-    return { value: undefined, skip: true };
+    })
+    return { value: undefined, skip: true }
   }
 
   // px passthrough
-  if (dimension.unit === 'px') {
-    return { value: dimension };
+  if (dimension.unit === "px") {
+    return { value: dimension }
   }
 
   // rem to px conversion
-  if (dimension.unit === 'rem') {
-    const remBasePx = context.options.remBasePx ?? 16;
-    const pxValue = dimension.value * remBasePx;
+  if (dimension.unit === "rem") {
+    const remBasePx = context.options.remBasePx ?? 16
+    const pxValue = dimension.value * remBasePx
 
     context.logger.warn({
-      group: 'plugin',
+      group: "plugin",
       label: PLUGIN_NAME,
       message: `Token "${context.tokenId}" converted from ${dimension.value}rem to ${pxValue}px (base: ${remBasePx}px)`,
-    });
+    })
 
     return {
       value: {
         value: pxValue,
-        unit: 'px',
+        unit: "px",
       },
-    };
+    }
   }
 
   // Unknown unit - warn and skip
   context.logger.warn({
-    group: 'plugin',
+    group: "plugin",
     label: PLUGIN_NAME,
     message: `Token "${context.tokenId}" has unsupported dimension unit: "${dimension.unit}". Figma only supports px units. Convert the value to px or use the 'transform' option to handle this token.`,
-  });
-  return { value: undefined, skip: true };
+  })
+  return { value: undefined, skip: true }
 }

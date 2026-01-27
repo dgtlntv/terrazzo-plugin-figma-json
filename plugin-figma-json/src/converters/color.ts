@@ -1,6 +1,6 @@
 import Color from 'colorjs.io';
 import type { ConverterContext, ConverterResult, DTCGColorValue } from '../lib.js';
-import { FIGMA_COLOR_SPACES, PLUGIN_NAME } from '../lib.js';
+import { FIGMA_COLOR_SPACES, isDTCGColorValue, PLUGIN_NAME } from '../lib.js';
 
 /**
  * Number of decimal places to round color components to.
@@ -73,7 +73,15 @@ const DTCG_TO_COLORJS_SPACE: Record<string, string> = {
  * // => { value: { colorSpace: "srgb", components: [...], alpha: 1 } }
  */
 export function convertColor(value: unknown, context: ConverterContext): ConverterResult {
-  const color = value as DTCGColorValue;
+  if (!isDTCGColorValue(value)) {
+    context.logger.warn({
+      group: 'plugin',
+      label: PLUGIN_NAME,
+      message: `Token "${context.tokenId}" has invalid color value: expected object with colorSpace and components`,
+    });
+    return { value: undefined, skip: true };
+  }
+  const color = value;
 
   // If already in a Figma-compatible color space, pass through with alpha normalization
   if (FIGMA_COLOR_SPACES.includes(color.colorSpace as (typeof FIGMA_COLOR_SPACES)[number])) {
@@ -126,8 +134,8 @@ export function convertColor(value: unknown, context: ConverterContext): Convert
     // Get the sRGB coordinates and normalize them
     const srgbChannels = normalizeComponents(srgbColor.coords as [number, number, number]);
 
-    // Log warning about color space conversion
-    context.logger.warn({
+    // Log info about color space conversion (expected behavior for non-sRGB colors)
+    context.logger.info({
       group: 'plugin',
       label: PLUGIN_NAME,
       message: `Token "${context.tokenId}" color converted from ${color.colorSpace} to sRGB`,

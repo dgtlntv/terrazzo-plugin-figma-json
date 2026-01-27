@@ -1,7 +1,7 @@
 import type { TransformHookOptions, TokenNormalized } from '@terrazzo/parser';
 import wcmatch from 'wildcard-match';
 import { convertToken } from './converters/index.js';
-import { type FigmaJsonPluginOptions, FORMAT_ID, hasValidResolverConfig, type TokenExtensions } from './lib.js';
+import { type FigmaJsonPluginOptions, FORMAT_ID, getPartialAliasOf, hasValidResolverConfig, INTERNAL_KEYS, type TokenExtensions } from './lib.js';
 
 /**
  * Register a transform with optional resolver input.
@@ -82,7 +82,7 @@ function transformToken(
     return;
   }
 
-  const partialAliasOf = (token as { partialAliasOf?: Record<string, string | undefined> }).partialAliasOf;
+  const partialAliasOf = getPartialAliasOf(token);
 
   // Convert the token value (always resolve to final value)
   const result = convertToken(token, rawValue, {
@@ -108,12 +108,12 @@ function transformToken(
         $type: subToken.$type,
         $value: subToken.value,
         // Include metadata for build phase to identify split sub-tokens
-        _splitFrom: token.id, // Parent token ID for source lookup
-        _tokenId: subId, // This sub-token's ID
+        [INTERNAL_KEYS.SPLIT_FROM]: token.id, // Parent token ID for source lookup
+        [INTERNAL_KEYS.TOKEN_ID]: subId, // This sub-token's ID
       };
       // Preserve alias reference for sub-token if it was a reference
       if (subToken.aliasOf) {
-        transformedValue._aliasOf = subToken.aliasOf;
+        transformedValue[INTERNAL_KEYS.ALIAS_OF] = subToken.aliasOf;
       }
       if (token.$description) {
         transformedValue.$description = token.$description;
@@ -150,7 +150,7 @@ function transformToken(
     if (typeof originalValueStr === 'string' && originalValueStr.startsWith('{') && originalValueStr.endsWith('}')) {
       directAliasOf = originalValueStr.slice(1, -1);
     }
-    transformedValue._aliasOf = directAliasOf;
+    transformedValue[INTERNAL_KEYS.ALIAS_OF] = directAliasOf;
   } else if (token.$type === 'color' && partialAliasOf) {
     // For colors without a direct alias, check if all components reference the same token
     // This handles JSON pointer references like { "$ref": "#/color/palette/white/$value/colorSpace" }
@@ -175,7 +175,7 @@ function transformToken(
     if (refs.length > 0) {
       const uniqueRefs = [...new Set(refs)];
       if (uniqueRefs.length === 1) {
-        transformedValue._aliasOf = uniqueRefs[0];
+        transformedValue[INTERNAL_KEYS.ALIAS_OF] = uniqueRefs[0];
       }
     }
   }

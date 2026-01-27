@@ -50,15 +50,28 @@ export function buildDefaultInput(resolverSource: NonNullable<Resolver['source']
 }
 
 /**
+ * Internal metadata property keys used for token processing.
+ * These are added during transform and removed during build.
+ */
+export const INTERNAL_KEYS = {
+  /** Target token ID for alias references */
+  ALIAS_OF: '_aliasOf',
+  /** Parent token ID for split sub-tokens (e.g., typography) */
+  SPLIT_FROM: '_splitFrom',
+  /** Token ID for split sub-tokens */
+  TOKEN_ID: '_tokenId',
+} as const;
+
+/**
  * Remove internal metadata properties from a parsed token value.
  * These properties are used for internal processing and should not appear in output.
  *
  * @param parsedValue - Token value object to clean (mutated in place)
  */
 export function removeInternalMetadata(parsedValue: Record<string, unknown>): void {
-  delete parsedValue._aliasOf;
-  delete parsedValue._splitFrom;
-  delete parsedValue._tokenId;
+  delete parsedValue[INTERNAL_KEYS.ALIAS_OF];
+  delete parsedValue[INTERNAL_KEYS.SPLIT_FROM];
+  delete parsedValue[INTERNAL_KEYS.TOKEN_ID];
 }
 
 export const FORMAT_ID = 'figma-json';
@@ -174,6 +187,35 @@ export const DTCG_TO_FIGMA_TYPE_MAP: Record<SupportedType, FigmaVariableType> = 
 };
 
 /**
+ * Partial alias information for composite types.
+ * This is an internal property from terrazzo parser that tracks
+ * which sub-properties of a composite token reference other tokens.
+ */
+export type PartialAliasOf = Record<string, string | undefined>;
+
+/**
+ * Extended token interface for internal properties not in public types.
+ * Terrazzo parser adds these properties but they're not exported in the type definitions.
+ */
+export interface TokenWithPartialAlias {
+  partialAliasOf?: PartialAliasOf;
+}
+
+/**
+ * Extract partialAliasOf from a token if present.
+ * This property is added by terrazzo parser for composite tokens but not in public types.
+ */
+export function getPartialAliasOf(token: unknown): PartialAliasOf | undefined {
+  if (token && typeof token === 'object' && 'partialAliasOf' in token) {
+    const value = (token as TokenWithPartialAlias).partialAliasOf;
+    if (value && typeof value === 'object') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Context passed to converters.
  */
 export interface ConverterContext {
@@ -239,11 +281,35 @@ export interface DTCGColorValue {
 }
 
 /**
+ * Type guard to validate DTCGColorValue structure.
+ */
+export function isDTCGColorValue(value: unknown): value is DTCGColorValue {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.colorSpace !== 'string') return false;
+  if (!Array.isArray(v.components) || v.components.length !== 3) return false;
+  for (const c of v.components) {
+    if (c !== 'none' && typeof c !== 'number') return false;
+  }
+  if (v.alpha !== undefined && v.alpha !== 'none' && typeof v.alpha !== 'number') return false;
+  return true;
+}
+
+/**
  * Dimension value structure in DTCG format.
  */
 export interface DTCGDimensionValue {
   value: number;
   unit: string;
+}
+
+/**
+ * Type guard to validate DTCGDimensionValue structure.
+ */
+export function isDTCGDimensionValue(value: unknown): value is DTCGDimensionValue {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.value === 'number' && typeof v.unit === 'string';
 }
 
 /**
@@ -255,6 +321,15 @@ export interface DTCGDurationValue {
 }
 
 /**
+ * Type guard to validate DTCGDurationValue structure.
+ */
+export function isDTCGDurationValue(value: unknown): value is DTCGDurationValue {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.value === 'number' && typeof v.unit === 'string';
+}
+
+/**
  * Typography value structure in DTCG format.
  */
 export interface DTCGTypographyValue {
@@ -263,6 +338,14 @@ export interface DTCGTypographyValue {
   fontWeight?: number | string;
   lineHeight?: number | DTCGDimensionValue;
   letterSpacing?: DTCGDimensionValue;
+}
+
+/**
+ * Type guard to validate DTCGTypographyValue structure.
+ * Only checks that it's an object - individual properties are validated during conversion.
+ */
+export function isDTCGTypographyValue(value: unknown): value is DTCGTypographyValue {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
