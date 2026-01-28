@@ -1,5 +1,6 @@
-import type { ConverterContext, ConverterResult, SubToken } from "../lib.js"
-import { isDTCGTypographyValue, PLUGIN_NAME } from "../lib.js"
+import { PLUGIN_NAME } from "../constants.js"
+import type { ConverterContext, ConverterResult, SubToken } from "../types.js"
+import { isDTCGTypographyValue } from "../utils.js"
 import { convertDimension } from "./dimension.js"
 import { convertFontFamily } from "./font-family.js"
 import { convertFontWeight } from "./font-weight.js"

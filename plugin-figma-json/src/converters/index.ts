@@ -1,12 +1,6 @@
 import type { TokenNormalized } from '@terrazzo/parser';
-import {
-  type ConverterContext,
-  type ConverterResult,
-  PLUGIN_NAME,
-  SUPPORTED_TYPES,
-  type SupportedType,
-  UNSUPPORTED_TYPES,
-} from '../lib.js';
+import { PLUGIN_NAME, SUPPORTED_TYPES, type SupportedType, UNSUPPORTED_TYPES } from '../constants.js';
+import type { ConverterContext, ConverterResult } from '../types.js';
 import { convertColor } from './color.js';
 import { convertDimension } from './dimension.js';
 import { convertDuration } from './duration.js';

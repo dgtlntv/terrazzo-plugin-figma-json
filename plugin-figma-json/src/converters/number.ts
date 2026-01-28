@@ -1,5 +1,5 @@
-import type { ConverterContext, ConverterResult } from '../lib.js';
-import { PLUGIN_NAME } from '../lib.js';
+import { PLUGIN_NAME } from '../constants.js';
+import type { ConverterContext, ConverterResult } from '../types.js';
 
 /**
  * Convert a DTCG number value to Figma-compatible format.

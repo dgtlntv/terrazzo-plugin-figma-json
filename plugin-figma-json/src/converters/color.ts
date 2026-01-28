@@ -1,6 +1,7 @@
 import Color from 'colorjs.io';
-import type { ConverterContext, ConverterResult, DTCGColorValue } from '../lib.js';
-import { FIGMA_COLOR_SPACES, isDTCGColorValue, PLUGIN_NAME } from '../lib.js';
+import { FIGMA_COLOR_SPACES, PLUGIN_NAME } from '../constants.js';
+import type { ConverterContext, ConverterResult, DTCGColorValue } from '../types.js';
+import { isDTCGColorValue } from '../utils.js';
 
 /**
  * Number of decimal places to round color components to.

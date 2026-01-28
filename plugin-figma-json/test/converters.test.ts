@@ -7,7 +7,7 @@ import { convertFontWeight } from '../src/converters/font-weight.js';
 import { convertNumber } from '../src/converters/number.js';
 import { convertTypography } from '../src/converters/typography.js';
 import type { TokenNormalized } from '@terrazzo/parser';
-import type { ConverterContext } from '../src/lib.js';
+import type { ConverterContext } from '../src/types.js';
 
 /**
  * Create a mock converter context for testing.
@@ -175,7 +175,7 @@ describe('convertDimension', () => {
     const result = convertDimension({ value: 1, unit: 'rem' }, ctx);
 
     expect(result.value).toEqual({ value: 16, unit: 'px' });
-    expect(ctx.logger.warn).toHaveBeenCalled();
+    expect(ctx.logger.info).toHaveBeenCalled();
   });
 
   it('converts rem to px using custom base', () => {

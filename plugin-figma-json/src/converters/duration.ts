@@ -1,5 +1,6 @@
-import type { ConverterContext, ConverterResult } from "../lib.js"
-import { isDTCGDurationValue, PLUGIN_NAME } from "../lib.js"
+import { PLUGIN_NAME } from "../constants.js"
+import type { ConverterContext, ConverterResult } from "../types.js"
+import { isDTCGDurationValue } from "../utils.js"
 
 /**
  * Convert a DTCG duration value to Figma-compatible format.

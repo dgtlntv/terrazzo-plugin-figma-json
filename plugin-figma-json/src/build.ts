@@ -1,13 +1,13 @@
 import type { BuildHookOptions, Resolver } from '@terrazzo/parser';
-import wcmatch from 'wildcard-match';
+import { FORMAT_ID, INTERNAL_KEYS } from './constants.js';
+import type { FigmaJsonPluginOptions } from './types.js';
 import {
   buildDefaultInput,
-  type FigmaJsonPluginOptions,
-  FORMAT_ID,
+  createExcludeMatcher,
   hasValidResolverConfig,
-  INTERNAL_KEYS,
+  parseTransformValue,
   removeInternalMetadata,
-} from './lib.js';
+} from './utils.js';
 
 export interface BuildOptions {
   exclude: FigmaJsonPluginOptions['exclude'];
@@ -37,18 +37,15 @@ function setNestedProperty(obj: Record<string, unknown>, path: string, value: un
   let current = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    if (part === undefined) continue;
+    const part = parts[i]!;
     if (!(part in current)) {
       current[part] = {};
     }
     current = current[part] as Record<string, unknown>;
   }
 
-  const lastPart = parts[parts.length - 1];
-  if (lastPart !== undefined) {
-    current[lastPart] = value;
-  }
+  const lastPart = parts[parts.length - 1]!;
+  current[lastPart] = value;
 }
 
 /**
@@ -229,64 +226,24 @@ function extractTokenIds(group: Record<string, unknown>, prefix = ''): TokenIdIn
   return ids;
 }
 
+interface TokenSourceMaps {
+  tokenSources: Map<string, SourceInfo[]>;
+  tokenOutputPaths: Map<string, string>;
+  allContexts: Set<string>;
+}
 
 /**
- * Build the Figma-compatible JSON output from transformed tokens.
- * Requires a resolver file - legacy mode is not supported.
- * Always returns output split by resolver structure (sets and modifier contexts).
+ * Build maps tracking which tokens belong to which sources.
+ * Processes both sets and modifier contexts from the resolver source.
  *
- * @returns Map of output name to JSON string (e.g., "primitive" -> "{...}")
+ * @param resolverSource - The resolver source configuration
+ * @returns Maps for token sources, output paths, and all context keys
  */
-export default function buildFigmaJson({
-  getTransforms,
-  exclude,
-  tokenName,
-  preserveReferences = true,
-  resolver,
-}: BuildOptions): Map<string, string> {
-  // Create exclude matcher
-  const shouldExclude = exclude?.length ? wcmatch(exclude) : () => false;
-
-  // When no valid resolver config, fall back to single output under "default" key
-  if (!hasValidResolverConfig(resolver)) {
-    // Get all transforms without resolver context
-    const transforms = getTransforms({ format: FORMAT_ID });
-    if (transforms.length === 0) {
-      return new Map();
-    }
-
-    const output: Record<string, unknown> = {};
-    for (const transform of transforms) {
-      if (!transform.token) continue;
-
-      const tokenId = transform.token.id;
-      if (shouldExclude(tokenId)) continue;
-
-      const outputName = tokenName?.(transform.token) ?? tokenId;
-      const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
-
-      removeInternalMetadata(parsedValue);
-      setNestedProperty(output, outputName, parsedValue);
-    }
-
-    const result = new Map<string, string>();
-    result.set('default', JSON.stringify(output, null, 2));
-    return result;
-  }
-
-  // After hasValidResolverConfig, resolver and source are guaranteed to exist
-  const resolverSource = resolver.source;
-  if (!resolverSource) {
-    return new Map();
-  }
-
-  // Track which tokens belong to which sources (a token can appear in multiple contexts)
+function buildTokenSourceMaps(resolverSource: NonNullable<Resolver['source']>): TokenSourceMaps {
   const tokenSources = new Map<string, SourceInfo[]>();
-
-  // Track the output path for each token ID (to preserve $root in output)
   const tokenOutputPaths = new Map<string, string>();
+  const allContexts = new Set<string>();
 
-  // Helper to add a source for a token
   function addTokenSource(tokenId: string, outputPath: string, info: SourceInfo) {
     const existing = tokenSources.get(tokenId);
     if (existing) {
@@ -294,13 +251,12 @@ export default function buildFigmaJson({
     } else {
       tokenSources.set(tokenId, [info]);
     }
-    // Store output path (first one wins if there are duplicates)
     if (!tokenOutputPaths.has(tokenId)) {
       tokenOutputPaths.set(tokenId, outputPath);
     }
   }
 
-  // Process sets - these tokens always appear in their set file
+  // Process sets
   if (resolverSource.sets) {
     for (const [setName, set] of Object.entries(resolverSource.sets)) {
       if (set.sources) {
@@ -314,9 +270,7 @@ export default function buildFigmaJson({
     }
   }
 
-  // Process modifiers - these tokens go into context-specific files
-  const allContexts = new Set<string>();
-
+  // Process modifiers
   if (resolverSource.modifiers) {
     for (const [modifierName, modifier] of Object.entries(resolverSource.modifiers)) {
       if (modifier.contexts) {
@@ -342,6 +296,63 @@ export default function buildFigmaJson({
     }
   }
 
+  return { tokenSources, tokenOutputPaths, allContexts };
+}
+
+
+/**
+ * Build the Figma-compatible JSON output from transformed tokens.
+ * Requires a resolver file - legacy mode is not supported.
+ * Always returns output split by resolver structure (sets and modifier contexts).
+ *
+ * @returns Map of output name to JSON string (e.g., "primitive" -> "{...}")
+ */
+export default function buildFigmaJson({
+  getTransforms,
+  exclude,
+  tokenName,
+  preserveReferences = true,
+  resolver,
+}: BuildOptions): Map<string, string> {
+  const shouldExclude = createExcludeMatcher(exclude);
+
+  // When no valid resolver config, fall back to single output under "default" key
+  if (!hasValidResolverConfig(resolver)) {
+    // Get all transforms without resolver context
+    const transforms = getTransforms({ format: FORMAT_ID });
+    if (transforms.length === 0) {
+      return new Map();
+    }
+
+    const output: Record<string, unknown> = {};
+    for (const transform of transforms) {
+      if (!transform.token) continue;
+
+      const tokenId = transform.token.id;
+      if (shouldExclude(tokenId)) continue;
+
+      const outputName = tokenName?.(transform.token) ?? tokenId;
+      const parsedValue = parseTransformValue(transform.value);
+      if (!parsedValue) continue;
+
+      removeInternalMetadata(parsedValue);
+      setNestedProperty(output, outputName, parsedValue);
+    }
+
+    const result = new Map<string, string>();
+    result.set('default', JSON.stringify(output, null, 2));
+    return result;
+  }
+
+  // After hasValidResolverConfig, resolver and source are guaranteed to exist
+  const resolverSource = resolver.source;
+  if (!resolverSource) {
+    return new Map();
+  }
+
+  // Build maps tracking token sources and output paths
+  const { tokenSources, tokenOutputPaths, allContexts } = buildTokenSourceMaps(resolverSource);
+
   // Group outputs by source
   const outputBySource = new Map<string, Record<string, unknown>>();
 
@@ -356,7 +367,8 @@ export default function buildFigmaJson({
 
   // Process set tokens using default transforms
   for (const transform of defaultTransforms) {
-    const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
+    const parsedValue = parseTransformValue(transform.value);
+    if (!parsedValue) continue;
 
     // Handle split sub-tokens (e.g., typography.text.primary.fontFamily)
     // These don't have a token object but have INTERNAL_KEYS.SPLIT_FROM metadata
@@ -474,7 +486,8 @@ export default function buildFigmaJson({
 
       // Use tracked output path (preserves $root) if no custom tokenName
       const outputName = tokenName?.(transform.token) ?? tokenOutputPaths.get(tokenId) ?? tokenId;
-      const parsedValue = typeof transform.value === 'string' ? JSON.parse(transform.value) : transform.value;
+      const parsedValue = parseTransformValue(transform.value);
+      if (!parsedValue) continue;
 
       // Get aliasOf from the transformed value (set during transform step) or fall back to token
       const aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF] ?? transform.token.aliasOf;

@@ -1,5 +1,6 @@
-import type { ConverterContext, ConverterResult } from "../lib.js"
-import { isDTCGDimensionValue, PLUGIN_NAME } from "../lib.js"
+import { PLUGIN_NAME } from "../constants.js"
+import type { ConverterContext, ConverterResult } from "../types.js"
+import { isDTCGDimensionValue } from "../utils.js"
 
 /**
  * Convert a DTCG dimension value to Figma-compatible format.
@@ -49,7 +50,7 @@ export function convertDimension(
     const remBasePx = context.options.remBasePx ?? 16
     const pxValue = dimension.value * remBasePx
 
-    context.logger.warn({
+    context.logger.info({
       group: "plugin",
       label: PLUGIN_NAME,
       message: `Token "${context.tokenId}" converted from ${dimension.value}rem to ${pxValue}px (base: ${remBasePx}px)`,

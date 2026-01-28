@@ -1,11 +1,14 @@
 import type { Plugin } from '@terrazzo/parser';
 import buildFigmaJson from './build.js';
-import { type FigmaJsonPluginOptions, FORMAT_ID, PLUGIN_NAME } from './lib.js';
+import { FORMAT_ID, PLUGIN_NAME } from './constants.js';
 import transformFigmaJson from './transform.js';
+import type { FigmaJsonPluginOptions } from './types.js';
 
 export * from './build.js';
-export * from './lib.js';
+export * from './constants.js';
 export * from './transform.js';
+export * from './types.js';
+export * from './utils.js';
 
 /**
  * Terrazzo plugin to convert DTCG design tokens to Figma-compatible JSON format.
