@@ -1,14 +1,14 @@
-import type { Plugin } from '@terrazzo/parser';
-import buildFigmaJson from './build.js';
-import { FORMAT_ID, PLUGIN_NAME } from './constants.js';
-import transformFigmaJson from './transform.js';
-import type { FigmaJsonPluginOptions } from './types.js';
+import type { Plugin } from "@terrazzo/parser"
+import buildFigmaJson from "./build.js"
+import { FORMAT_ID, PLUGIN_NAME } from "./constants.js"
+import transformFigmaJson from "./transform.js"
+import type { FigmaJsonPluginOptions } from "./types.js"
 
-export * from './build.js';
-export * from './constants.js';
-export * from './transform.js';
-export * from './types.js';
-export * from './utils.js';
+export * from "./build.js"
+export * from "./constants.js"
+export * from "./transform.js"
+export * from "./types.js"
+export * from "./utils.js"
 
 /**
  * Terrazzo plugin to convert DTCG design tokens to Figma-compatible JSON format.
@@ -40,29 +40,34 @@ export * from './utils.js';
  * });
  *
  */
-export default function figmaJsonPlugin(options?: FigmaJsonPluginOptions): Plugin {
-  const { skipBuild } = options ?? {};
-  const filename = options?.filename ?? 'tokens.figma.json';
+export default function figmaJsonPlugin(
+  options?: FigmaJsonPluginOptions,
+): Plugin {
+  const { skipBuild } = options ?? {}
+  const filename = options?.filename ?? "tokens.figma.json"
 
   return {
     name: PLUGIN_NAME,
 
     async transform(transformOptions) {
       // Skip if another figma-json plugin has already run
-      const existingTransforms = transformOptions.getTransforms({ format: FORMAT_ID, id: '*' });
+      const existingTransforms = transformOptions.getTransforms({
+        format: FORMAT_ID,
+        id: "*",
+      })
       if (existingTransforms.length) {
-        return;
+        return
       }
 
       transformFigmaJson({
         transform: transformOptions,
         options: options ?? {},
-      });
+      })
     },
 
     async build({ getTransforms, outputFile, resolver }) {
       if (skipBuild === true) {
-        return;
+        return
       }
 
       const result = buildFigmaJson({
@@ -71,14 +76,15 @@ export default function figmaJsonPlugin(options?: FigmaJsonPluginOptions): Plugi
         tokenName: options?.tokenName,
         preserveReferences: options?.preserveReferences,
         resolver,
-      });
+      })
 
       // Output multiple files based on resolver structure
       for (const [sourceName, contents] of result) {
         // sourceName is like "primitive" or "breakpoint-small" or "default" (when no resolver)
-        const outputName = sourceName === 'default' ? filename : `${sourceName}.${filename}`;
-        outputFile(outputName, contents);
+        const outputName =
+          sourceName === "default" ? filename : `${sourceName}.${filename}`
+        outputFile(outputName, contents)
       }
     },
-  };
+  }
 }
