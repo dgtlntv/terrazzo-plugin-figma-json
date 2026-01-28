@@ -7,7 +7,9 @@ Terrazzo plugin that converts W3C DTCG design tokens to Figma-compatible JSON.
 ```
 src/
 ├── index.ts           # Plugin entry, registers transform + build hooks
-├── lib.ts             # Types, constants, utilities
+├── types.ts           # TypeScript interfaces and type definitions
+├── constants.ts       # Plugin constants (PLUGIN_NAME, FORMAT_ID, SUPPORTED_TYPES, etc.)
+├── utils.ts           # Utility functions and type guards
 ├── transform.ts       # Transform hook (DTCG → Figma conversion)
 ├── build.ts           # Build hook (output JSON, handle resolvers)
 └── converters/
@@ -86,13 +88,31 @@ Unsupported: shadow, border, gradient, transition, strokeStyle, cubicBezier
 }
 ```
 
-## Key Utilities (`lib.ts`)
+## Key Modules
 
-- `hasValidResolverConfig()` - Checks for user-defined sets/modifiers
+### Constants (`constants.ts`)
+
+- `PLUGIN_NAME`, `FORMAT_ID` - Plugin identifiers
+- `INTERNAL_KEYS` - Internal metadata keys (`_aliasOf`, `_splitFrom`, `_tokenId`)
+- `SUPPORTED_TYPES`, `UNSUPPORTED_TYPES` - Token type arrays
+- `FIGMA_COLOR_SPACES` - Native Figma color spaces (sRGB, HSL)
+
+### Types (`types.ts`)
+
+- `FigmaJsonPluginOptions` - Plugin configuration interface
+- `ConverterContext`, `ConverterResult`, `SubToken` - Converter types
+- `DTCGColorValue`, `DTCGDimensionValue`, etc. - DTCG value structures
+- `TokenExtensions`, `FigmaExtensionKeys` - Extension interfaces
+
+### Utilities (`utils.ts`)
+
+- `hasValidResolverConfig()` - Type guard for valid resolver configuration
 - `buildDefaultInput()` - Creates input with default modifier values
-- `removeInternalMetadata()` - Strips `_aliasOf`, `_splitFrom`, `_tokenId`
+- `createExcludeMatcher()` - Creates glob pattern matcher for token exclusion
+- `parseTransformValue()` - Safely parses JSON transform values
+- `removeInternalMetadata()` - Strips internal keys before output
 - `getPartialAliasOf()` - Extracts partial alias data from composite tokens
-- Type guards: `isDTCGColorValue()`, `isDTCGDimensionValue()`, etc.
+- Type guards: `isDTCGColorValue()`, `isDTCGDimensionValue()`, `isDTCGDurationValue()`, `isDTCGTypographyValue()`
 
 ## Figma Extensions
 
