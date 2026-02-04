@@ -2,6 +2,14 @@
 
 A [Terrazzo](https://terrazzo.app) plugin that converts W3C DTCG design tokens into Figma-compatible JSON format for import into Figma Variables.
 
+## Requirements
+
+This plugin requires Terrazzo 2.0.0-beta.0 or later:
+
+```bash
+npm install @terrazzo/cli@2.0.0-beta.0 @terrazzo/parser@2.0.0-beta.0
+```
+
 ## Installation
 
 ```bash
@@ -49,7 +57,7 @@ npx tz build
 
 ## Output Structure
 
-When using a resolver file (recommended), the plugin automatically splits output by resolver sets and modifier contexts:
+With a resolver file, the plugin splits output by resolver sets and modifier contexts:
 
 ```
 dist/
@@ -60,7 +68,7 @@ dist/
 └── breakpoint-small.figma.json
 ```
 
-Without a resolver, all tokens are output to a single file.
+Without a resolver, all tokens are output to a single file (`tokens.figma.json` by default).
 
 ## Supported Token Types
 
@@ -158,13 +166,7 @@ For cross-collection aliases (referencing tokens in a different output file):
 
 ## Color Space Conversion
 
-Figma only supports **sRGB** and **HSL** color spaces. Other color spaces are converted to sRGB:
-
-- Display P3, Rec2020, A98 RGB, ProPhoto RGB → sRGB
-- OKLCH, OkLab, Lab, LCH → sRGB
-- XYZ-D65, XYZ-D50, HWB, sRGB-linear → sRGB
-
-Colors outside the sRGB gamut will be clipped with a warning.
+Figma only supports sRGB and HSL color spaces. All other color spaces defined in the DTCG spec are converted to sRGB. Colors outside the sRGB gamut are clipped with a warning.
 
 ## Boolean Tokens
 
@@ -250,4 +252,4 @@ Token `c` will resolve to `b.x`, not `a.x`. This is a limitation of how the Terr
 
 ## License
 
-MIT
+[MIT](LICENSE)
