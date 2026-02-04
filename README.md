@@ -1,6 +1,6 @@
 # terrazzo-plugin-figma-json
 
-A [Terrazzo](https://terrazzo.app) plugin that converts W3C DTCG design tokens into Figma-compatible JSON format for import into Figma Variables.
+A [Terrazzo](https://terrazzo.app) plugin that converts W3C DTCG design tokens into Figma-compatible JSON format for [import into Figma Variables](https://help.figma.com/hc/en-us/articles/15343816063383-Modes-for-variables#h_01KAGYPSFC984XDB4YWBCNRZJ7).
 
 ## Requirements
 
