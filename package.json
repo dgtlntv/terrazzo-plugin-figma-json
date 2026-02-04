@@ -1,6 +1,6 @@
 {
   "name": "terrazzo-plugin-figma-json",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Convert DTCG design tokens JSON into Figma-compatible design tokens JSON format.",
   "license": "MIT",
   "type": "module",
