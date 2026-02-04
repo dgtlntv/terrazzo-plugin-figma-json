@@ -1,20 +1,20 @@
-import type { BuildHookOptions, Resolver } from "@terrazzo/parser"
-import { FORMAT_ID, INTERNAL_KEYS } from "./constants.js"
-import type { FigmaJsonPluginOptions } from "./types.js"
+import type { BuildHookOptions, Resolver } from '@terrazzo/parser';
+import { FORMAT_ID, INTERNAL_KEYS } from './constants.js';
+import type { FigmaJsonPluginOptions } from './types.js';
 import {
   buildDefaultInput,
   createExcludeMatcher,
   hasValidResolverConfig,
   parseTransformValue,
   removeInternalMetadata,
-} from "./utils.js"
+} from './utils.js';
 
 export interface BuildOptions {
-  exclude: FigmaJsonPluginOptions["exclude"]
-  tokenName?: FigmaJsonPluginOptions["tokenName"]
-  getTransforms: BuildHookOptions["getTransforms"]
-  preserveReferences?: FigmaJsonPluginOptions["preserveReferences"]
-  resolver?: Resolver
+  exclude: FigmaJsonPluginOptions['exclude'];
+  tokenName?: FigmaJsonPluginOptions['tokenName'];
+  getTransforms: BuildHookOptions['getTransforms'];
+  preserveReferences?: FigmaJsonPluginOptions['preserveReferences'];
+  resolver?: Resolver;
 }
 
 /**
@@ -30,26 +30,24 @@ export interface BuildOptions {
  * setNestedProperty(obj, "color.primary", { $value: "#ff0000" });
  * // obj = { color: { primary: { $value: "#ff0000" } } }
  */
-function setNestedProperty(
-  obj: Record<string, unknown>,
-  path: string,
-  value: unknown,
-): void {
-  const parts = path.split(".")
-  if (parts.length === 0) return
-
-  let current = obj
-
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i]!
-    if (!(part in current)) {
-      current[part] = {}
-    }
-    current = current[part] as Record<string, unknown>
+function setNestedProperty(obj: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split('.');
+  if (parts.length === 0) {
+    return;
   }
 
-  const lastPart = parts[parts.length - 1]!
-  current[lastPart] = value
+  let current = obj;
+
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i]!;
+    if (!(part in current)) {
+      current[part] = {};
+    }
+    current = current[part] as Record<string, unknown>;
+  }
+
+  const lastPart = parts[parts.length - 1]!;
+  current[lastPart] = value;
 }
 
 /**
@@ -63,7 +61,7 @@ function setNestedProperty(
  * toFigmaVariableName("color.primary.base") // "color/primary/base"
  */
 function toFigmaVariableName(tokenId: string): string {
-  return tokenId.replace(/\./g, "/")
+  return tokenId.replace(/\./g, '/');
 }
 
 /**
@@ -78,26 +76,26 @@ function toFigmaVariableName(tokenId: string): string {
  * normalizeRootInPath("color.primary") // "color.primary" (unchanged)
  */
 function normalizeRootInPath(path: string): string {
-  return path.replace(/\.\$root\b/g, ".root")
+  return path.replace(/\.\$root\b/g, '.root');
 }
 
 /**
  * Token source tracking info.
  */
 type SourceInfo = {
-  source: string
-  isModifier: boolean
-  modifierName?: string
-  contextName?: string
-}
+  source: string;
+  isModifier: boolean;
+  modifierName?: string;
+  contextName?: string;
+};
 
 interface HandleAliasReferenceOptions {
-  parsedValue: Record<string, unknown>
-  aliasOf: string
-  sourceName: string
-  tokenSources: Map<string, SourceInfo[]>
-  tokenOutputPaths: Map<string, string>
-  preserveReferences: boolean
+  parsedValue: Record<string, unknown>;
+  aliasOf: string;
+  sourceName: string;
+  tokenSources: Map<string, SourceInfo[]>;
+  tokenOutputPaths: Map<string, string>;
+  preserveReferences: boolean;
 }
 
 /**
@@ -129,53 +127,49 @@ function handleAliasReference({
   preserveReferences,
 }: HandleAliasReferenceOptions): void {
   if (!preserveReferences || !aliasOf) {
-    return
+    return;
   }
 
   // Normalize aliasOf to remove $root for lookups (terrazzo uses normalized IDs)
-  const normalizedAliasOf = aliasOf.replace(/\.\$root\b/g, "")
+  const normalizedAliasOf = aliasOf.replace(/\.\$root\b/g, '');
   // Get target's output path, or normalize $root -> root in the original aliasOf
-  const targetOutputPath =
-    tokenOutputPaths.get(normalizedAliasOf) ?? normalizeRootInPath(aliasOf)
+  const targetOutputPath = tokenOutputPaths.get(normalizedAliasOf) ?? normalizeRootInPath(aliasOf);
 
   // Find the target token's sources, handling split sub-tokens by looking up parent
-  let targetSources = tokenSources.get(normalizedAliasOf)
+  let targetSources = tokenSources.get(normalizedAliasOf);
   if (!targetSources) {
     // Try parent tokens for split sub-tokens (e.g., "typography.heading.fontFamily")
-    const parts = normalizedAliasOf.split(".")
+    const parts = normalizedAliasOf.split('.');
     while (parts.length > 1 && !targetSources) {
-      parts.pop()
-      targetSources = tokenSources.get(parts.join("."))
+      parts.pop();
+      targetSources = tokenSources.get(parts.join('.'));
     }
   }
 
   if (!targetSources?.length) {
     // Target token not found in any source - leave value as-is
-    return
+    return;
   }
 
   // Check if target exists in current source (same-file reference)
-  const inCurrentSource = targetSources.some((s) => s.source === sourceName)
+  const inCurrentSource = targetSources.some((s) => s.source === sourceName);
   if (inCurrentSource) {
     // Same file reference: use curly brace syntax
-    parsedValue.$value = `{${targetOutputPath}}`
-    return
+    parsedValue.$value = `{${targetOutputPath}}`;
+    return;
   }
 
   // Check for SET sources only (not modifier contexts)
   // We never want to reference other modifier contexts (e.g., dark shouldn't reference light)
-  const setSource = targetSources.find((s) => !s.isModifier)
+  const setSource = targetSources.find((s) => !s.isModifier);
   if (setSource) {
     // Cross-file reference to a set: use resolved value + aliasData
-    const extensions = (parsedValue.$extensions ?? {}) as Record<
-      string,
-      unknown
-    >
-    extensions["com.figma.aliasData"] = {
+    const extensions = (parsedValue.$extensions ?? {}) as Record<string, unknown>;
+    extensions['com.figma.aliasData'] = {
       targetVariableSetName: setSource.source,
       targetVariableName: toFigmaVariableName(targetOutputPath),
-    }
-    parsedValue.$extensions = extensions
+    };
+    parsedValue.$extensions = extensions;
   }
 }
 
@@ -184,9 +178,9 @@ function handleAliasReference({
  */
 interface TokenIdInfo {
   /** The normalized token ID (without $root, as terrazzo uses) */
-  id: string
+  id: string;
   /** The output path (with $root preserved for proper JSON structure) */
-  outputPath: string
+  outputPath: string;
 }
 
 /**
@@ -205,49 +199,44 @@ interface TokenIdInfo {
  * extractTokenIds({ color: { primary: { $value: "#ff0000" } } })
  * // [{ id: "color.primary", outputPath: "color.primary" }]
  */
-function extractTokenIds(
-  group: Record<string, unknown>,
-  prefix = "",
-): TokenIdInfo[] {
-  const ids: TokenIdInfo[] = []
+function extractTokenIds(group: Record<string, unknown>, prefix = ''): TokenIdInfo[] {
+  const ids: TokenIdInfo[] = [];
 
   for (const [key, value] of Object.entries(group)) {
     // Skip $ properties (like $type, $description, $schema, etc.)
     // But handle $root specially
-    if (key.startsWith("$") && key !== "$root") {
-      continue
+    if (key.startsWith('$') && key !== '$root') {
+      continue;
     }
 
     // Build paths:
     // - normalizedPath: what terrazzo uses as the token ID (no $root)
     // - outputPath: what we output to JSON (uses "root" without $ for Figma compatibility)
-    const outputKey = key === "$root" ? "root" : key
-    const outputPath = prefix ? `${prefix}.${outputKey}` : outputKey
-    const normalizedPath = key === "$root" ? prefix : outputPath
+    const outputKey = key === '$root' ? 'root' : key;
+    const outputPath = prefix ? `${prefix}.${outputKey}` : outputKey;
+    const normalizedPath = key === '$root' ? prefix : outputPath;
 
     // Check if this is a token (has $value)
-    if (value && typeof value === "object" && "$value" in value) {
+    if (value && typeof value === 'object' && '$value' in value) {
       // Only add if we have a valid normalized path
       if (normalizedPath) {
-        ids.push({ id: normalizedPath, outputPath })
+        ids.push({ id: normalizedPath, outputPath });
       }
       // $root is always a leaf token, don't recurse
       // Regular tokens with $value are also leaves
-    } else if (value && typeof value === "object") {
+    } else if (value && typeof value === 'object') {
       // Recurse into nested groups (only for non-token objects)
-      ids.push(
-        ...extractTokenIds(value as Record<string, unknown>, outputPath),
-      )
+      ids.push(...extractTokenIds(value as Record<string, unknown>, outputPath));
     }
   }
 
-  return ids
+  return ids;
 }
 
 interface TokenSourceMaps {
-  tokenSources: Map<string, SourceInfo[]>
-  tokenOutputPaths: Map<string, string>
-  allContexts: Set<string>
+  tokenSources: Map<string, SourceInfo[]>;
+  tokenOutputPaths: Map<string, string>;
+  allContexts: Set<string>;
 }
 
 /**
@@ -257,26 +246,20 @@ interface TokenSourceMaps {
  * @param resolverSource - The resolver source configuration
  * @returns Maps for token sources, output paths, and all context keys
  */
-function buildTokenSourceMaps(
-  resolverSource: NonNullable<Resolver["source"]>,
-): TokenSourceMaps {
-  const tokenSources = new Map<string, SourceInfo[]>()
-  const tokenOutputPaths = new Map<string, string>()
-  const allContexts = new Set<string>()
+function buildTokenSourceMaps(resolverSource: NonNullable<Resolver['source']>): TokenSourceMaps {
+  const tokenSources = new Map<string, SourceInfo[]>();
+  const tokenOutputPaths = new Map<string, string>();
+  const allContexts = new Set<string>();
 
-  function addTokenSource(
-    tokenId: string,
-    outputPath: string,
-    info: SourceInfo,
-  ) {
-    const existing = tokenSources.get(tokenId)
+  function addTokenSource(tokenId: string, outputPath: string, info: SourceInfo) {
+    const existing = tokenSources.get(tokenId);
     if (existing) {
-      existing.push(info)
+      existing.push(info);
     } else {
-      tokenSources.set(tokenId, [info])
+      tokenSources.set(tokenId, [info]);
     }
     if (!tokenOutputPaths.has(tokenId)) {
-      tokenOutputPaths.set(tokenId, outputPath)
+      tokenOutputPaths.set(tokenId, outputPath);
     }
   }
 
@@ -285,12 +268,12 @@ function buildTokenSourceMaps(
     for (const [setName, set] of Object.entries(resolverSource.sets)) {
       if (set.sources) {
         for (const source of set.sources) {
-          const tokenInfos = extractTokenIds(source as Record<string, unknown>)
+          const tokenInfos = extractTokenIds(source as Record<string, unknown>);
           for (const { id, outputPath } of tokenInfos) {
             addTokenSource(id, outputPath, {
               source: setName,
               isModifier: false,
-            })
+            });
           }
         }
       }
@@ -299,28 +282,22 @@ function buildTokenSourceMaps(
 
   // Process modifiers
   if (resolverSource.modifiers) {
-    for (const [modifierName, modifier] of Object.entries(
-      resolverSource.modifiers,
-    )) {
+    for (const [modifierName, modifier] of Object.entries(resolverSource.modifiers)) {
       if (modifier.contexts) {
-        for (const [contextName, contextSources] of Object.entries(
-          modifier.contexts,
-        )) {
-          const contextKey = `${modifierName}-${contextName}`
-          allContexts.add(contextKey)
+        for (const [contextName, contextSources] of Object.entries(modifier.contexts)) {
+          const contextKey = `${modifierName}-${contextName}`;
+          allContexts.add(contextKey);
 
           if (Array.isArray(contextSources)) {
             for (const source of contextSources) {
-              const tokenInfos = extractTokenIds(
-                source as Record<string, unknown>,
-              )
+              const tokenInfos = extractTokenIds(source as Record<string, unknown>);
               for (const { id, outputPath } of tokenInfos) {
                 addTokenSource(id, outputPath, {
                   source: contextKey,
                   isModifier: true,
                   modifierName,
                   contextName,
-                })
+                });
               }
             }
           }
@@ -329,7 +306,7 @@ function buildTokenSourceMaps(
     }
   }
 
-  return { tokenSources, tokenOutputPaths, allContexts }
+  return { tokenSources, tokenOutputPaths, allContexts };
 }
 
 /**
@@ -346,115 +323,120 @@ export default function buildFigmaJson({
   preserveReferences = true,
   resolver,
 }: BuildOptions): Map<string, string> {
-  const shouldExclude = createExcludeMatcher(exclude)
+  const shouldExclude = createExcludeMatcher(exclude);
 
   // When no valid resolver config, fall back to single output under "default" key
   if (!hasValidResolverConfig(resolver)) {
     // Get all transforms without resolver context
-    const transforms = getTransforms({ format: FORMAT_ID })
+    const transforms = getTransforms({ format: FORMAT_ID });
     if (transforms.length === 0) {
-      return new Map()
+      return new Map();
     }
 
-    const output: Record<string, unknown> = {}
+    const output: Record<string, unknown> = {};
     for (const transform of transforms) {
-      if (!transform.token) continue
+      if (!transform.token) {
+        continue;
+      }
 
-      const tokenId = transform.token.id
-      if (shouldExclude(tokenId)) continue
+      const tokenId = transform.token.id;
+      if (shouldExclude(tokenId)) {
+        continue;
+      }
 
-      const outputName = tokenName?.(transform.token) ?? tokenId
-      const parsedValue = parseTransformValue(transform.value)
-      if (!parsedValue) continue
+      const outputName = tokenName?.(transform.token) ?? tokenId;
+      const parsedValue = parseTransformValue(transform.value);
+      if (!parsedValue) {
+        continue;
+      }
 
-      removeInternalMetadata(parsedValue)
-      setNestedProperty(output, outputName, parsedValue)
+      removeInternalMetadata(parsedValue);
+      setNestedProperty(output, outputName, parsedValue);
     }
 
-    const result = new Map<string, string>()
-    result.set("default", JSON.stringify(output, null, 2))
-    return result
+    const result = new Map<string, string>();
+    result.set('default', JSON.stringify(output, null, 2));
+    return result;
   }
 
   // After hasValidResolverConfig, resolver and source are guaranteed to exist
-  const resolverSource = resolver.source
+  const resolverSource = resolver.source;
   if (!resolverSource) {
-    return new Map()
+    return new Map();
   }
 
   // Build maps tracking token sources and output paths
-  const { tokenSources, tokenOutputPaths, allContexts } =
-    buildTokenSourceMaps(resolverSource)
+  const { tokenSources, tokenOutputPaths, allContexts } = buildTokenSourceMaps(resolverSource);
 
   // Group outputs by source
-  const outputBySource = new Map<string, Record<string, unknown>>()
+  const outputBySource = new Map<string, Record<string, unknown>>();
 
   // Initialize empty outputs for all contexts (so empty files are created)
   for (const contextKey of allContexts) {
-    outputBySource.set(contextKey, {})
+    outputBySource.set(contextKey, {});
   }
 
   // Get transforms using default input (for set tokens)
-  const defaultInput = buildDefaultInput(resolverSource)
+  const defaultInput = buildDefaultInput(resolverSource);
   const defaultTransforms = getTransforms({
     format: FORMAT_ID,
     input: defaultInput,
-  })
+  });
 
   // Process set tokens using default transforms
   for (const transform of defaultTransforms) {
-    const parsedValue = parseTransformValue(transform.value)
-    if (!parsedValue) continue
+    const parsedValue = parseTransformValue(transform.value);
+    if (!parsedValue) {
+      continue;
+    }
 
     // Handle split sub-tokens (e.g., typography.text.primary.fontFamily)
     // These don't have a token object but have INTERNAL_KEYS.SPLIT_FROM metadata
-    let tokenId: string
-    let outputName: string
-    let aliasOf: string | undefined
-    let sourceLookupId: string
+    let tokenId: string;
+    let outputName: string;
+    let aliasOf: string | undefined;
+    let sourceLookupId: string;
 
     if (transform.token) {
-      tokenId = transform.token.id
+      tokenId = transform.token.id;
       // Use tracked output path (preserves $root) if no custom tokenName
-      outputName =
-        tokenName?.(transform.token) ??
-        tokenOutputPaths.get(tokenId) ??
-        tokenId
-      aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF] ?? transform.token.aliasOf
-      sourceLookupId = tokenId
-    } else if (
-      parsedValue[INTERNAL_KEYS.SPLIT_FROM] &&
-      parsedValue[INTERNAL_KEYS.TOKEN_ID]
-    ) {
+      outputName = tokenName?.(transform.token) ?? tokenOutputPaths.get(tokenId) ?? tokenId;
+      aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF] ?? transform.token.aliasOf;
+      sourceLookupId = tokenId;
+    } else if (parsedValue[INTERNAL_KEYS.SPLIT_FROM] && parsedValue[INTERNAL_KEYS.TOKEN_ID]) {
       // Split sub-token: use parent's source
-      tokenId = parsedValue[INTERNAL_KEYS.TOKEN_ID]
+      tokenId = parsedValue[INTERNAL_KEYS.TOKEN_ID];
       // For split tokens, replace parent ID with parent's output path in the token ID
-      const parentId = parsedValue[INTERNAL_KEYS.SPLIT_FROM]
-      const parentOutputPath = tokenOutputPaths.get(parentId)
+      const parentId = parsedValue[INTERNAL_KEYS.SPLIT_FROM];
+      const parentOutputPath = tokenOutputPaths.get(parentId);
       if (parentOutputPath && parentOutputPath !== parentId) {
         // Replace parent ID prefix with parent output path (to preserve $root)
-        outputName = parentOutputPath + tokenId.slice(parentId.length)
+        outputName = parentOutputPath + tokenId.slice(parentId.length);
       } else {
-        outputName = tokenId
+        outputName = tokenId;
       }
-      aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF]
-      sourceLookupId = parentId // Look up source using parent token ID
+      aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF];
+      sourceLookupId = parentId; // Look up source using parent token ID
     } else {
       // Unknown transform without token - skip
-      continue
+      continue;
     }
 
-    if (shouldExclude(tokenId)) continue
+    if (shouldExclude(tokenId)) {
+      continue;
+    }
 
-    const sources = tokenSources.get(sourceLookupId) ?? []
-    const setSource = sources.find((s) => !s.isModifier)
-    if (!setSource) continue // Skip tokens that aren't in a set
+    const sources = tokenSources.get(sourceLookupId) ?? [];
+    const setSource = sources.find((s) => !s.isModifier);
+    if (!setSource) {
+      continue; // Skip tokens that aren't in a set
+    }
 
-    const sourceName = setSource.source
-    let sourceOutput = outputBySource.get(sourceName)
+    const sourceName = setSource.source;
+    let sourceOutput = outputBySource.get(sourceName);
     if (!sourceOutput) {
-      sourceOutput = {}
-      outputBySource.set(sourceName, sourceOutput)
+      sourceOutput = {};
+      outputBySource.set(sourceName, sourceOutput);
     }
 
     // Get aliasOf from the transformed value or token (already set above)
@@ -468,27 +450,29 @@ export default function buildFigmaJson({
         tokenSources,
         tokenOutputPaths,
         preserveReferences,
-      })
+      });
     }
 
-    removeInternalMetadata(parsedValue)
-    setNestedProperty(sourceOutput, outputName, parsedValue)
+    removeInternalMetadata(parsedValue);
+    setNestedProperty(sourceOutput, outputName, parsedValue);
   }
 
   // Process modifier context tokens
   // Group modifier tokens by their context
-  const modifierTokensByContext = new Map<string, Set<string>>()
+  const modifierTokensByContext = new Map<string, Set<string>>();
 
   for (const [tokenId, sources] of tokenSources) {
     for (const sourceInfo of sources) {
-      if (!sourceInfo.isModifier) continue
+      if (!sourceInfo.isModifier) {
+        continue;
+      }
 
-      const contextKey = sourceInfo.source
-      const existing = modifierTokensByContext.get(contextKey)
+      const contextKey = sourceInfo.source;
+      const existing = modifierTokensByContext.get(contextKey);
       if (existing) {
-        existing.add(tokenId)
+        existing.add(tokenId);
       } else {
-        modifierTokensByContext.set(contextKey, new Set([tokenId]))
+        modifierTokensByContext.set(contextKey, new Set([tokenId]));
       }
     }
   }
@@ -496,47 +480,53 @@ export default function buildFigmaJson({
   // For each context, get transforms with the appropriate input
   for (const [contextKey, tokenIds] of modifierTokensByContext) {
     // Find the source info for this context
-    let contextInfo: SourceInfo | undefined
+    let contextInfo: SourceInfo | undefined;
     for (const tokenId of tokenIds) {
-      const sources = tokenSources.get(tokenId)
-      contextInfo = sources?.find((s) => s.source === contextKey)
-      if (contextInfo) break
+      const sources = tokenSources.get(tokenId);
+      contextInfo = sources?.find((s) => s.source === contextKey);
+      if (contextInfo) {
+        break;
+      }
     }
 
-    if (!contextInfo?.modifierName || !contextInfo?.contextName) continue
+    if (!contextInfo?.modifierName || !contextInfo?.contextName) {
+      continue;
+    }
 
     // Build input for this context (start with defaults, override specific modifier)
-    const input: Record<string, string> = { ...defaultInput }
-    input[contextInfo.modifierName] = contextInfo.contextName
+    const input: Record<string, string> = { ...defaultInput };
+    input[contextInfo.modifierName] = contextInfo.contextName;
 
     // Get transforms for this context
-    const contextTransforms = getTransforms({ format: FORMAT_ID, input })
+    const contextTransforms = getTransforms({ format: FORMAT_ID, input });
 
-    let contextOutput = outputBySource.get(contextKey)
+    let contextOutput = outputBySource.get(contextKey);
     if (!contextOutput) {
-      contextOutput = {}
-      outputBySource.set(contextKey, contextOutput)
+      contextOutput = {};
+      outputBySource.set(contextKey, contextOutput);
     }
 
     // Add tokens for this context
     for (const tokenId of tokenIds) {
-      if (shouldExclude(tokenId)) continue
+      if (shouldExclude(tokenId)) {
+        continue;
+      }
 
       // Find the transform for this token (skip transforms without tokens - synthetic sub-tokens)
-      const transform = contextTransforms.find((t) => t.token?.id === tokenId)
-      if (!transform) continue
+      const transform = contextTransforms.find((t) => t.token?.id === tokenId);
+      if (!transform) {
+        continue;
+      }
 
       // Use tracked output path (preserves $root) if no custom tokenName
-      const outputName =
-        tokenName?.(transform.token) ??
-        tokenOutputPaths.get(tokenId) ??
-        tokenId
-      const parsedValue = parseTransformValue(transform.value)
-      if (!parsedValue) continue
+      const outputName = tokenName?.(transform.token) ?? tokenOutputPaths.get(tokenId) ?? tokenId;
+      const parsedValue = parseTransformValue(transform.value);
+      if (!parsedValue) {
+        continue;
+      }
 
       // Get aliasOf from the transformed value (set during transform step) or fall back to token
-      const aliasOf =
-        parsedValue[INTERNAL_KEYS.ALIAS_OF] ?? transform.token.aliasOf
+      const aliasOf = parsedValue[INTERNAL_KEYS.ALIAS_OF] ?? transform.token.aliasOf;
 
       // Handle alias references based on preserveReferences setting
       if (aliasOf) {
@@ -547,18 +537,18 @@ export default function buildFigmaJson({
           tokenSources,
           tokenOutputPaths,
           preserveReferences,
-        })
+        });
       }
 
-      removeInternalMetadata(parsedValue)
-      setNestedProperty(contextOutput, outputName, parsedValue)
+      removeInternalMetadata(parsedValue);
+      setNestedProperty(contextOutput, outputName, parsedValue);
     }
   }
 
   // Return split output by source
-  const result = new Map<string, string>()
+  const result = new Map<string, string>();
   for (const [sourceName, output] of outputBySource) {
-    result.set(sourceName, JSON.stringify(output, null, 2))
+    result.set(sourceName, JSON.stringify(output, null, 2));
   }
-  return result
+  return result;
 }

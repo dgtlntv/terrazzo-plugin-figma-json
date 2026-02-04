@@ -1,10 +1,10 @@
-import { PLUGIN_NAME } from "../constants.js"
-import type { ConverterContext, ConverterResult, SubToken } from "../types.js"
-import { isDTCGTypographyValue } from "../utils.js"
-import { convertDimension } from "./dimension.js"
-import { convertFontFamily } from "./font-family.js"
-import { convertFontWeight } from "./font-weight.js"
-import { convertNumber } from "./number.js"
+import { PLUGIN_NAME } from '../constants.js';
+import type { ConverterContext, ConverterResult, SubToken } from '../types.js';
+import { isDTCGTypographyValue } from '../utils.js';
+import { convertDimension } from './dimension.js';
+import { convertFontFamily } from './font-family.js';
+import { convertFontWeight } from './font-weight.js';
+import { convertLineHeight } from './line-height.js';
 
 /**
  * Get the correct alias reference for a typography sub-property.
@@ -30,18 +30,20 @@ function getSubTokenAlias(
   propertyName: string,
   allTokens: Record<string, { $type?: string }> | undefined,
 ): string | undefined {
-  if (!aliasOf) return undefined
+  if (!aliasOf) {
+    return undefined;
+  }
 
   // Check if the referenced token is a typography token
-  const referencedToken = allTokens?.[aliasOf]
-  if (referencedToken?.$type === "typography") {
+  const referencedToken = allTokens?.[aliasOf];
+  if (referencedToken?.$type === 'typography') {
     // The target is also a typography token that will be split
     // Append the property name to reference the correct sub-token
-    return `${aliasOf}.${propertyName}`
+    return `${aliasOf}.${propertyName}`;
   }
 
   // Otherwise, return the alias as-is (it's a primitive token)
-  return aliasOf
+  return aliasOf;
 }
 
 /**
@@ -60,19 +62,16 @@ function getSubTokenAlias(
  * }, context);
  * // => { value: undefined, split: true, subTokens: [...] }
  */
-export function convertTypography(
-  value: unknown,
-  context: ConverterContext,
-): ConverterResult {
+export function convertTypography(value: unknown, context: ConverterContext): ConverterResult {
   if (!isDTCGTypographyValue(value)) {
     context.logger.warn({
-      group: "plugin",
+      group: 'plugin',
       label: PLUGIN_NAME,
       message: `Token "${context.tokenId}" has invalid typography value: expected object, got ${typeof value}`,
-    })
-    return { value: undefined, skip: true }
+    });
+    return { value: undefined, skip: true };
   }
-  const typography = value
+  const typography = value;
 
   // Get partial alias information from the token (populated by terrazzo parser)
   // Note: partialAliasOf contains the FINAL alias targets after full resolution.
@@ -82,147 +81,114 @@ export function convertTypography(
   // 2. replaceNode() replaces $ref with the resolved curly-brace alias
   // 3. resolveAliases() processes the curly-brace alias and OVERWRITES the refMap entry
   // So we only see the final target, not intermediate JSON pointer targets.
-  const partialAliasOf = context.partialAliasOf
+  const partialAliasOf = context.partialAliasOf;
 
-  const subTokens: SubToken[] = []
+  const subTokens: SubToken[] = [];
 
   // Convert fontFamily
   if (typography.fontFamily !== undefined) {
-    const aliasOf = getSubTokenAlias(
-      partialAliasOf?.fontFamily,
-      "fontFamily",
-      context.allTokens,
-    )
+    const aliasOf = getSubTokenAlias(partialAliasOf?.fontFamily, 'fontFamily', context.allTokens);
 
     const result = convertFontFamily(typography.fontFamily, {
       ...context,
       tokenId: `${context.tokenId}.fontFamily`,
-    })
+    });
     if (!result.skip) {
       subTokens.push({
-        idSuffix: "fontFamily",
-        $type: "fontFamily",
+        idSuffix: 'fontFamily',
+        $type: 'fontFamily',
         value: result.value,
         aliasOf,
-      })
+      });
     }
   }
 
   // Convert fontSize (dimension)
+  // We also store the resolved fontSize for lineHeight calculation
+  let resolvedFontSize: { value: number; unit: string } | undefined;
   if (typography.fontSize !== undefined) {
-    const aliasOf = getSubTokenAlias(
-      partialAliasOf?.fontSize,
-      "fontSize",
-      context.allTokens,
-    )
+    const aliasOf = getSubTokenAlias(partialAliasOf?.fontSize, 'fontSize', context.allTokens);
 
     const result = convertDimension(typography.fontSize, {
       ...context,
       tokenId: `${context.tokenId}.fontSize`,
-    })
+    });
     if (!result.skip) {
+      resolvedFontSize = result.value as { value: number; unit: string };
       subTokens.push({
-        idSuffix: "fontSize",
-        $type: "dimension",
+        idSuffix: 'fontSize',
+        $type: 'dimension',
         value: result.value,
         aliasOf,
-      })
+      });
     }
   }
 
   // Convert fontWeight
   if (typography.fontWeight !== undefined) {
-    const aliasOf = getSubTokenAlias(
-      partialAliasOf?.fontWeight,
-      "fontWeight",
-      context.allTokens,
-    )
+    const aliasOf = getSubTokenAlias(partialAliasOf?.fontWeight, 'fontWeight', context.allTokens);
 
     const result = convertFontWeight(typography.fontWeight, {
       ...context,
       tokenId: `${context.tokenId}.fontWeight`,
-    })
+    });
     if (!result.skip) {
       subTokens.push({
-        idSuffix: "fontWeight",
-        $type: result.outputType ?? "fontWeight",
+        idSuffix: 'fontWeight',
+        $type: result.outputType ?? 'fontWeight',
         value: result.value,
         aliasOf,
-      })
+      });
     }
   }
 
-  // Convert lineHeight (number)
+  // Convert lineHeight (W3C number → Figma dimension)
+  // Per W3C DTCG spec, lineHeight is a unitless number (multiplier).
+  // Figma requires a dimension, so we compute: lineHeight × fontSize.
+  // Note: This loses the reference to any primitive number token - see line-height.ts for details.
   if (typography.lineHeight !== undefined) {
-    const aliasOf = getSubTokenAlias(
-      partialAliasOf?.lineHeight,
-      "lineHeight",
-      context.allTokens,
-    )
-
-    // lineHeight can be a number or a dimension
-    const lineHeightValue = typography.lineHeight
-    if (typeof lineHeightValue === "number") {
-      const result = convertNumber(lineHeightValue, {
-        ...context,
-        tokenId: `${context.tokenId}.lineHeight`,
-      })
-      if (!result.skip) {
-        subTokens.push({
-          idSuffix: "lineHeight",
-          $type: "number",
-          value: result.value,
-          aliasOf,
-        })
-      }
-    } else {
-      // Treat as dimension
-      const result = convertDimension(lineHeightValue, {
-        ...context,
-        tokenId: `${context.tokenId}.lineHeight`,
-      })
-      if (!result.skip) {
-        subTokens.push({
-          idSuffix: "lineHeight",
-          $type: "dimension",
-          value: result.value,
-          aliasOf,
-        })
-      }
+    const result = convertLineHeight(typography.lineHeight, {
+      ...context,
+      tokenId: `${context.tokenId}.lineHeight`,
+      fontSize: resolvedFontSize,
+    });
+    if (!result.skip) {
+      subTokens.push({
+        idSuffix: 'lineHeight',
+        $type: 'dimension',
+        value: result.value,
+        // No aliasOf: the computed dimension cannot reference the original number token
+      });
     }
   }
 
   // Convert letterSpacing (dimension)
   if (typography.letterSpacing !== undefined) {
-    const aliasOf = getSubTokenAlias(
-      partialAliasOf?.letterSpacing,
-      "letterSpacing",
-      context.allTokens,
-    )
+    const aliasOf = getSubTokenAlias(partialAliasOf?.letterSpacing, 'letterSpacing', context.allTokens);
 
     const result = convertDimension(typography.letterSpacing, {
       ...context,
       tokenId: `${context.tokenId}.letterSpacing`,
-    })
+    });
     if (!result.skip) {
       subTokens.push({
-        idSuffix: "letterSpacing",
-        $type: "dimension",
+        idSuffix: 'letterSpacing',
+        $type: 'dimension',
         value: result.value,
         aliasOf,
-      })
+      });
     }
   }
 
   // If no sub-tokens were created, skip the token
   if (subTokens.length === 0) {
     context.logger.warn({
-      group: "plugin",
+      group: 'plugin',
       label: PLUGIN_NAME,
       message: `Token "${context.tokenId}" typography value has no valid sub-properties`,
-    })
-    return { value: undefined, skip: true }
+    });
+    return { value: undefined, skip: true };
   }
 
-  return { value: undefined, split: true, subTokens }
+  return { value: undefined, split: true, subTokens };
 }

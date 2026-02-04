@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "allowArbitraryExtensions": true,
-    "baseUrl": "src",
     "declaration": true,
     "declarationMap": true,
     "esModuleInterop": true,
@@ -15,12 +14,13 @@
     "noUnusedParameters": true,
     "outDir": "dist",
     "resolveJsonModule": true,
+    "rootDir": "src",
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
     "target": "ESNext",
     "verbatimModuleSyntax": true
   },
-  "include": ["./src/", "./test/"],
+  "include": ["./src/"],
   "exclude": ["**/dist/*", "**/node_modules/*"]
 }

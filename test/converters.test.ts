@@ -1,12 +1,14 @@
+import type { TokenNormalized } from '@terrazzo/parser';
 import { describe, expect, it, vi } from 'vitest';
 import { convertColor } from '../src/converters/color.js';
 import { convertDimension } from '../src/converters/dimension.js';
 import { convertDuration } from '../src/converters/duration.js';
 import { convertFontFamily } from '../src/converters/font-family.js';
 import { convertFontWeight } from '../src/converters/font-weight.js';
+import type { LineHeightConverterContext } from '../src/converters/line-height.js';
+import { convertLineHeight } from '../src/converters/line-height.js';
 import { convertNumber } from '../src/converters/number.js';
 import { convertTypography } from '../src/converters/typography.js';
-import type { TokenNormalized } from '@terrazzo/parser';
 import type { ConverterContext } from '../src/types.js';
 
 /**
@@ -428,6 +430,120 @@ describe('convertNumber', () => {
   });
 });
 
+describe('convertLineHeight', () => {
+  /**
+   * Create a lineHeight converter context with fontSize.
+   */
+  function createLineHeightContext(overrides?: Partial<LineHeightConverterContext>): LineHeightConverterContext {
+    return {
+      ...createContext(),
+      fontSize: { value: 16, unit: 'px' },
+      ...overrides,
+    };
+  }
+
+  it('computes absolute lineHeight from multiplier and fontSize', () => {
+    const ctx = createLineHeightContext({ fontSize: { value: 16, unit: 'px' } });
+    const result = convertLineHeight(1.5, ctx);
+
+    // 1.5 × 16px = 24px
+    expect(result.value).toEqual({ value: 24, unit: 'px' });
+    expect(result.skip).toBeUndefined();
+  });
+
+  it('handles different fontSize values', () => {
+    const ctx = createLineHeightContext({ fontSize: { value: 20, unit: 'px' } });
+    const result = convertLineHeight(1.4, ctx);
+
+    // 1.4 × 20px = 28px
+    expect(result.value).toEqual({ value: 28, unit: 'px' });
+  });
+
+  it('handles lineHeight of 1 (same as fontSize)', () => {
+    const ctx = createLineHeightContext({ fontSize: { value: 16, unit: 'px' } });
+    const result = convertLineHeight(1, ctx);
+
+    expect(result.value).toEqual({ value: 16, unit: 'px' });
+  });
+
+  it('handles fractional multipliers', () => {
+    const ctx = createLineHeightContext({ fontSize: { value: 16, unit: 'px' } });
+    const result = convertLineHeight(1.25, ctx);
+
+    // 1.25 × 16px = 20px
+    expect(result.value).toEqual({ value: 20, unit: 'px' });
+  });
+
+  it('warns and skips when fontSize is missing', () => {
+    const ctx = createLineHeightContext({ fontSize: undefined });
+    const result = convertLineHeight(1.5, ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('warns and skips non-number values', () => {
+    const ctx = createLineHeightContext();
+    const result = convertLineHeight('1.5', ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('warns and skips non-finite values', () => {
+    const ctx = createLineHeightContext();
+
+    expect(convertLineHeight(Infinity, ctx).skip).toBe(true);
+    expect(convertLineHeight(-Infinity, ctx).skip).toBe(true);
+    expect(convertLineHeight(NaN, ctx).skip).toBe(true);
+  });
+
+  it('logs info message about the conversion', () => {
+    const ctx = createLineHeightContext({ fontSize: { value: 16, unit: 'px' } });
+    convertLineHeight(1.5, ctx);
+
+    expect(ctx.logger.info).toHaveBeenCalled();
+  });
+
+  it('rounds lineHeight by default', () => {
+    const ctx = createLineHeightContext({ fontSize: { value: 14, unit: 'px' } });
+    const result = convertLineHeight(1.4, ctx);
+
+    // 1.4 × 14px = 19.6px → rounded to 20px
+    expect(result.value).toEqual({ value: 20, unit: 'px' });
+  });
+
+  it('rounds lineHeight when roundLineHeight is true', () => {
+    const ctx = createLineHeightContext({
+      fontSize: { value: 14, unit: 'px' },
+      options: { roundLineHeight: true },
+    });
+    const result = convertLineHeight(1.4, ctx);
+
+    // 1.4 × 14px = 19.6px → rounded to 20px
+    expect(result.value).toEqual({ value: 20, unit: 'px' });
+  });
+
+  it('does not round lineHeight when roundLineHeight is false', () => {
+    const ctx = createLineHeightContext({
+      fontSize: { value: 14, unit: 'px' },
+      options: { roundLineHeight: false },
+    });
+    const result = convertLineHeight(1.4, ctx);
+
+    // 1.4 × 14px = 19.6px → not rounded
+    expect(result.value).toEqual({ value: 19.599999999999998, unit: 'px' });
+  });
+
+  it('does not change value when already a whole number', () => {
+    const ctx = createLineHeightContext({ fontSize: { value: 16, unit: 'px' } });
+    const result = convertLineHeight(1.5, ctx);
+
+    // 1.5 × 16px = 24px → no rounding needed
+    expect(result.value).toEqual({ value: 24, unit: 'px' });
+  });
+});
+
 describe('convertTypography', () => {
   it('splits typography into sub-tokens with all properties', () => {
     const ctx = createContext();
@@ -460,10 +576,12 @@ describe('convertTypography', () => {
     expect(fontWeightToken?.$type).toBe('number');
     expect(fontWeightToken?.value).toBe(400);
 
-    // Check lineHeight
+    // Check lineHeight (W3C number multiplier → Figma dimension: 1.5 × 16px = 24px)
     const lineHeightToken = result.subTokens?.find((t) => t.idSuffix === 'lineHeight');
-    expect(lineHeightToken?.$type).toBe('number');
-    expect(lineHeightToken?.value).toBe(1.5);
+    expect(lineHeightToken?.$type).toBe('dimension');
+    expect(lineHeightToken?.value).toEqual({ value: 24, unit: 'px' });
+    // No aliasOf since computed value loses reference to primitive number token
+    expect(lineHeightToken?.aliasOf).toBeUndefined();
 
     // Check letterSpacing
     const letterSpacingToken = result.subTokens?.find((t) => t.idSuffix === 'letterSpacing');
@@ -515,11 +633,29 @@ describe('convertTypography', () => {
     expect(fontWeightToken?.value).toBe('bold');
   });
 
-  it('handles lineHeight as dimension', () => {
+  it('skips lineHeight when fontSize is missing (cannot compute absolute value)', () => {
     const ctx = createContext();
     const result = convertTypography(
       {
-        lineHeight: { value: 24, unit: 'px' },
+        fontFamily: 'Inter',
+        lineHeight: 1.5, // No fontSize to multiply with
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    // lineHeight should be skipped, only fontFamily included
+    expect(result.subTokens).toHaveLength(1);
+    expect(result.subTokens?.find((t) => t.idSuffix === 'lineHeight')).toBeUndefined();
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('computes lineHeight from multiplier and fontSize (rounded by default)', () => {
+    const ctx = createContext();
+    const result = convertTypography(
+      {
+        fontSize: { value: 14, unit: 'px' },
+        lineHeight: 1.4, // 1.4 × 14px = 19.6px → rounded to 20px
       },
       ctx,
     );
@@ -527,7 +663,7 @@ describe('convertTypography', () => {
     expect(result.split).toBe(true);
     const lineHeightToken = result.subTokens?.find((t) => t.idSuffix === 'lineHeight');
     expect(lineHeightToken?.$type).toBe('dimension');
-    expect(lineHeightToken?.value).toEqual({ value: 24, unit: 'px' });
+    expect(lineHeightToken?.value).toEqual({ value: 20, unit: 'px' });
   });
 
   it('converts rem to px for fontSize', () => {
@@ -630,7 +766,9 @@ describe('convertTypography', () => {
     // Typography references get the property name appended
     expect(fontFamilyToken?.aliasOf).toBe('typography.base.fontFamily');
     expect(fontSizeToken?.aliasOf).toBe('typography.base.fontSize');
-    expect(lineHeightToken?.aliasOf).toBe('typography.base.lineHeight');
+    // lineHeight loses its alias because we compute an absolute value (multiplier × fontSize)
+    expect(lineHeightToken?.aliasOf).toBeUndefined();
+    expect(lineHeightToken?.value).toEqual({ value: 24, unit: 'px' }); // 1.5 × 16px
   });
 
   it('handles mixed references (some to typography, some to primitives)', () => {

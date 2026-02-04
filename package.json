@@ -1,15 +1,67 @@
 {
-  "name": "terrazzo-plugin-figma-json-workspace",
-  "private": true,
+  "name": "terrazzo-plugin-figma-json",
+  "version": "0.1.0",
+  "description": "Convert DTCG design tokens JSON into Figma-compatible design tokens JSON format.",
+  "license": "MIT",
   "type": "module",
+  "author": "dgtlntv",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dgtlntv/terrazzo-plugin-figma-json.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dgtlntv/terrazzo-plugin-figma-json/issues"
+  },
+  "homepage": "https://github.com/dgtlntv/terrazzo-plugin-figma-json#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "design tokens",
+    "design system",
+    "dtcg",
+    "w3c",
+    "figma",
+    "terrazzo"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tz build",
-    "build:watch": "tz build --watch"
+    "build": "rolldown -c && tsc --emitDeclarationOnly",
+    "dev": "rolldown -w -c",
+    "format": "biome check --fix --unsafe .",
+    "lint": "pnpm run \"/^lint:(js|ts)/\"",
+    "lint:js": "biome check .",
+    "lint:ts": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm run lint && pnpm run test && pnpm run build"
+  },
+  "peerDependencies": {
+    "@terrazzo/cli": "^2.0.0-beta.0",
+    "@terrazzo/parser": "^2.0.0-beta.0"
+  },
+  "dependencies": {
+    "colorjs.io": "^0.6.1",
+    "wildcard-match": "^5.1.4"
   },
   "devDependencies": {
-    "@terrazzo/cli": "^2.0.0-beta.0",
-    "@terrazzo/parser": "^2.0.0-beta.0",
-    "terrazzo-plugin-figma-json": "file:./plugin-figma-json"
-  },
-  "packageManager": "pnpm@10.26.0+sha512.3b3f6c725ebe712506c0ab1ad4133cf86b1f4b687effce62a9b38b4d72e3954242e643190fc51fa1642949c735f403debd44f5cb0edd657abe63a8b6a7e1e402"
+    "@biomejs/biome": "^2.3.13",
+    "@terrazzo/cli": "2.0.0-beta.0",
+    "@terrazzo/parser": "2.0.0-beta.0",
+    "@types/node": "^25.0.10",
+    "rolldown": "1.0.0-rc.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
 }

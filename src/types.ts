@@ -1,4 +1,4 @@
-import type { Logger, TokenNormalized } from "@terrazzo/parser"
+import type { Logger, TokenNormalized } from '@terrazzo/parser';
 
 /**
  * Extension keys used by Figma in the $extensions object.
@@ -10,32 +10,32 @@ export interface FigmaExtensionKeys {
    * Use "boolean" to treat a number token as a boolean (0 = false, non-zero = true).
    * Key: "com.figma.type"
    */
-  "com.figma.type"?: "boolean"
+  'com.figma.type'?: 'boolean';
   /**
    * Cross-collection alias data for Figma.
    * Key: "com.figma.aliasData"
    */
-  "com.figma.aliasData"?: {
-    collection: string
-    mode: string
-  }
+  'com.figma.aliasData'?: {
+    collection: string;
+    mode: string;
+  };
 }
 
 /**
  * Token extensions object that may include Figma-specific keys.
  */
 export type TokenExtensions = FigmaExtensionKeys & {
-  [key: string]: unknown
-}
+  [key: string]: unknown;
+};
 
 /**
  * Output token structure for Figma-compatible JSON.
  */
 export interface FigmaTokenValue {
-  $type: string
-  $value: unknown
-  $description?: string
-  $extensions?: TokenExtensions
+  $type: string;
+  $value: unknown;
+  $description?: string;
+  $extensions?: TokenExtensions;
 }
 
 /**
@@ -43,14 +43,14 @@ export interface FigmaTokenValue {
  * This is an internal property from terrazzo parser that tracks
  * which sub-properties of a composite token reference other tokens.
  */
-export type PartialAliasOf = Record<string, string | undefined>
+export type PartialAliasOf = Record<string, string | undefined>;
 
 /**
  * Extended token interface for internal properties not in public types.
  * Terrazzo parser adds these properties but they're not exported in the type definitions.
  */
 export interface TokenWithPartialAlias {
-  partialAliasOf?: PartialAliasOf
+  partialAliasOf?: PartialAliasOf;
 }
 
 /**
@@ -61,43 +61,43 @@ export interface FigmaJsonPluginOptions {
    * Output filename for the Figma-compatible JSON.
    * @default "tokens.figma.json"
    */
-  filename?: string
+  filename?: string;
 
   /**
    * Glob patterns to exclude tokens from output.
    * @example ["internal.*", "deprecated.*"]
    */
-  exclude?: string[]
+  exclude?: string[];
 
   /**
    * Custom transform function to override token values before output.
    * Return undefined to use the default transformation.
    */
-  transform?: (token: TokenNormalized) => unknown | undefined
+  transform?: (token: TokenNormalized) => unknown | undefined;
 
   /**
    * Custom function to control the token name in the output.
    */
-  tokenName?: (token: TokenNormalized) => string
+  tokenName?: (token: TokenNormalized) => string;
 
   /**
    * Skip generating the output file.
    * Useful if consuming transforms in another plugin.
    * @default false
    */
-  skipBuild?: boolean
+  skipBuild?: boolean;
 
   /**
    * Base pixel value for rem to px conversion.
    * @default 16
    */
-  remBasePx?: number
+  remBasePx?: number;
 
   /**
    * Whether to log warnings for unsupported token types.
    * @default true
    */
-  warnOnUnsupported?: boolean
+  warnOnUnsupported?: boolean;
 
   /**
    * Preserve token references (aliases) in the output.
@@ -108,80 +108,96 @@ export interface FigmaJsonPluginOptions {
    * - All values are fully resolved, no references preserved
    * @default true
    */
-  preserveReferences?: boolean
+  preserveReferences?: boolean;
+
+  /**
+   * Round computed lineHeight values to whole pixels.
+   * When true (default): lineHeight values are rounded to integers (e.g., 24px)
+   * When false: lineHeight values keep full precision (e.g., 23.999999px)
+   *
+   * This only affects typography tokens where lineHeight is a unitless multiplier
+   * that gets computed to an absolute px value (multiplier × fontSize).
+   * @default true
+   */
+  roundLineHeight?: boolean;
 }
 
 /**
  * Context passed to converters.
  */
 export interface ConverterContext {
-  logger: Logger
-  options: FigmaJsonPluginOptions
-  tokenId: string
-  extensions?: TokenExtensions
-  allTokens?: Record<string, TokenNormalized>
-  originalValue?: unknown
-  partialAliasOf?: Record<string, string | undefined>
+  logger: Logger;
+  options: FigmaJsonPluginOptions;
+  tokenId: string;
+  extensions?: TokenExtensions;
+  allTokens?: Record<string, TokenNormalized>;
+  originalValue?: unknown;
+  partialAliasOf?: Record<string, string | undefined>;
 }
 
 /**
  * Sub-token information for split composite tokens (e.g., typography).
  */
 export interface SubToken {
-  idSuffix: string
-  $type: string
-  value: unknown
-  aliasOf?: string
+  idSuffix: string;
+  $type: string;
+  value: unknown;
+  aliasOf?: string;
 }
 
 /**
  * Result returned by a converter.
  */
 export interface ConverterResult {
-  value: unknown
-  skip?: boolean
-  outputType?: string
-  split?: boolean
-  subTokens?: SubToken[]
+  value: unknown;
+  skip?: boolean;
+  outputType?: string;
+  split?: boolean;
+  subTokens?: SubToken[];
 }
 
 /**
  * Color value structure in DTCG format.
  */
 export interface DTCGColorValue {
-  colorSpace: string
-  components: [number | "none", number | "none", number | "none"]
-  alpha?: number | "none"
+  colorSpace: string;
+  components: [number | 'none', number | 'none', number | 'none'];
+  alpha?: number | 'none';
 }
 
 /**
  * Dimension value structure in DTCG format.
  */
 export interface DTCGDimensionValue {
-  value: number
-  unit: string
+  value: number;
+  unit: string;
 }
 
 /**
  * Duration value structure in DTCG format.
  */
 export interface DTCGDurationValue {
-  value: number
-  unit: string
+  value: number;
+  unit: string;
 }
 
 /**
  * Typography value structure in DTCG format.
+ *
+ * Note: Per W3C DTCG spec, lineHeight is a number (unitless multiplier).
+ * Figma requires dimension tokens for lineHeight, so the plugin converts
+ * the multiplier to an absolute px value by multiplying with fontSize.
  */
 export interface DTCGTypographyValue {
-  fontFamily?: string | string[]
-  fontSize?: DTCGDimensionValue
-  fontWeight?: number | string
-  lineHeight?: number | DTCGDimensionValue
-  letterSpacing?: DTCGDimensionValue
+  fontFamily?: string | string[];
+  fontSize?: DTCGDimensionValue;
+  fontWeight?: number | string;
+  /** Unitless multiplier (e.g., 1.5 means 1.5× fontSize). Converted to dimension for Figma. */
+  lineHeight?: number;
+  letterSpacing?: DTCGDimensionValue;
 }
 
 /**
  * Figma variable types.
  */
-export type FigmaVariableType = "Color" | "Number" | "String" | "Boolean"
+export type FigmaVariableType = 'Color' | 'Number' | 'String' | 'Boolean';

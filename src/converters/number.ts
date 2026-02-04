@@ -1,5 +1,5 @@
-import { PLUGIN_NAME } from "../constants.js"
-import type { ConverterContext, ConverterResult } from "../types.js"
+import { PLUGIN_NAME } from '../constants.js';
+import type { ConverterContext, ConverterResult } from '../types.js';
 
 /**
  * Convert a DTCG number value to Figma-compatible format.
@@ -15,36 +15,33 @@ import type { ConverterContext, ConverterResult } from "../types.js"
  * convertNumber(0, contextWithBooleanExt) // => { value: false }
  * convertNumber(1, contextWithBooleanExt) // => { value: true }
  */
-export function convertNumber(
-  value: unknown,
-  context: ConverterContext,
-): ConverterResult {
-  if (typeof value !== "number") {
+export function convertNumber(value: unknown, context: ConverterContext): ConverterResult {
+  if (typeof value !== 'number') {
     context.logger.warn({
-      group: "plugin",
+      group: 'plugin',
       label: PLUGIN_NAME,
       message: `Token "${context.tokenId}" has invalid number value: ${typeof value}`,
-    })
-    return { value: undefined, skip: true }
+    });
+    return { value: undefined, skip: true };
   }
 
   if (!Number.isFinite(value)) {
     context.logger.warn({
-      group: "plugin",
+      group: 'plugin',
       label: PLUGIN_NAME,
       message: `Token "${context.tokenId}" has non-finite number value: ${value}`,
-    })
-    return { value: undefined, skip: true }
+    });
+    return { value: undefined, skip: true };
   }
 
   // Check for boolean type override via com.figma.type extension
   // Per Figma docs: $extensions: { "com.figma.type": "boolean" }
-  const figmaType = context.extensions?.["com.figma.type"]
-  if (figmaType === "boolean") {
+  const figmaType = context.extensions?.['com.figma.type'];
+  if (figmaType === 'boolean') {
     // Convert number to boolean: 0 = false, non-zero = true
-    return { value: value !== 0 }
+    return { value: value !== 0 };
   }
 
   // Number passthrough
-  return { value }
+  return { value };
 }

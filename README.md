@@ -104,12 +104,14 @@ Figma doesn't support composite typography tokens, so they're automatically spli
       "fontFamily": { "$type": "fontFamily", "$value": "Inter" },
       "fontSize": { "$type": "dimension", "$value": { "value": 24, "unit": "px" } },
       "fontWeight": { "$type": "fontWeight", "$value": 700 },
-      "lineHeight": { "$type": "number", "$value": 1.2 },
+      "lineHeight": { "$type": "dimension", "$value": { "value": 29, "unit": "px" } },
       "letterSpacing": { "$type": "dimension", "$value": { "value": 0, "unit": "px" } }
     }
   }
 }
 ```
+
+Note: `lineHeight` is converted from a unitless multiplier to absolute px (see [Figma Limitations](#figma-limitations)).
 
 ## Unsupported Token Types
 
@@ -216,6 +218,35 @@ figmaJson({
   },
 })
 ```
+
+## Figma Limitations
+
+Figma Variables have constraints that differ from the W3C DTCG specification. This plugin handles these automatically, but be aware of the following:
+
+### lineHeight Conversion
+
+W3C DTCG specifies `lineHeight` as a unitless number (multiplier relative to fontSize, e.g., `1.5`). Figma requires `lineHeight` to be a dimension with px units.
+
+The plugin converts by multiplying: `lineHeight × fontSize`. For example, `lineHeight: 1.5` with `fontSize: 16px` becomes `24px`.
+
+**Trade-off**: Any reference to a primitive number token for lineHeight is lost, since the computed px value cannot maintain an alias to the original multiplier.
+
+### $root Token Naming
+
+The DTCG spec uses `$root` for default mode values. Figma doesn't allow `$` in variable names, so the plugin converts `$root` to `root` in the output.
+
+### Cross-File Alias Resolution
+
+When a token uses a JSON pointer (`$ref`) that points to another token using curly-brace alias syntax, the intermediate reference is lost. For example:
+
+```json
+{
+  "a": { "$value": { "x": "{b.x}" } },
+  "c": { "$ref": "#/a/$value/x" }
+}
+```
+
+Token `c` will resolve to `b.x`, not `a.x`. This is a limitation of how the Terrazzo parser resolves references.
 
 ## License
 
