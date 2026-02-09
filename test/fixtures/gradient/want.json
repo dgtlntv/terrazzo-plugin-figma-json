@@ -1,0 +1,80 @@
+{
+  "gradient": {
+    "primary": {
+      "0": {
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0.4,
+              1
+            ],
+            "alpha": 1
+          },
+          "$description": "Primary gradient"
+        }
+      },
+      "1": {
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0.6,
+              0.8
+            ],
+            "alpha": 1
+          },
+          "$description": "Primary gradient"
+        }
+      }
+    },
+    "rainbow": {
+      "0": {
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              1,
+              0,
+              0
+            ],
+            "alpha": 1
+          }
+        }
+      },
+      "1": {
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              1,
+              0
+            ],
+            "alpha": 1
+          }
+        }
+      },
+      "2": {
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              1
+            ],
+            "alpha": 1
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,12 +1,15 @@
 import type { TokenNormalized } from '@terrazzo/parser';
 import { PLUGIN_NAME, SUPPORTED_TYPES, type SupportedType, UNSUPPORTED_TYPES } from '../constants.js';
 import type { ConverterContext, ConverterResult } from '../types.js';
+import { convertBorder } from './border.js';
 import { convertColor } from './color.js';
 import { convertDimension } from './dimension.js';
 import { convertDuration } from './duration.js';
 import { convertFontFamily } from './font-family.js';
 import { convertFontWeight } from './font-weight.js';
+import { convertGradient } from './gradient.js';
 import { convertNumber } from './number.js';
+import { convertShadow } from './shadow.js';
 import { convertTypography } from './typography.js';
 
 /**
@@ -25,6 +28,9 @@ const converters: Record<SupportedType, Converter> = {
   fontWeight: convertFontWeight,
   number: convertNumber,
   typography: convertTypography,
+  shadow: convertShadow,
+  border: convertBorder,
+  gradient: convertGradient,
 };
 
 /**

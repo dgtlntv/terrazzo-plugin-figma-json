@@ -81,6 +81,9 @@ Without a resolver, all tokens are output to a single file (`tokens.figma.json` 
 | `fontWeight` | Number or String | Values pass through with validation |
 | `number` | Number or Boolean | Numbers pass through; use `com.figma.type: "boolean"` for booleans |
 | `typography` | Split tokens | Split into fontFamily, fontSize, fontWeight, lineHeight, letterSpacing |
+| `shadow` | Split tokens | Split into color, offsetX, offsetY, blur, spread; indexed for multiple layers (`inset` not applicable in Figma) |
+| `border` | Split tokens (partial) | Split into color, width (`style` not applicable in Figma) |
+| `gradient` | Split tokens (partial) | Stop colors extracted (`position` not applicable in Figma) |
 
 ### Typography Token Splitting
 
@@ -121,11 +124,113 @@ Figma doesn't support composite typography tokens, so they're automatically spli
 
 Note: `lineHeight` is converted from a unitless multiplier to absolute px (see [Figma Limitations](#figma-limitations)).
 
+### Shadow Token Splitting
+
+Shadow tokens are split into individual sub-tokens. Array shadows (multiple layers) use indexed prefixes.
+
+**Input:**
+```json
+{
+  "shadow": {
+    "$type": "shadow",
+    "medium": {
+      "$value": {
+        "color": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0.2 },
+        "offsetX": { "value": 0, "unit": "px" },
+        "offsetY": { "value": 4, "unit": "px" },
+        "blur": { "value": 8, "unit": "px" },
+        "spread": { "value": 0, "unit": "px" }
+      }
+    }
+  }
+}
+```
+
+**Output:**
+```json
+{
+  "shadow": {
+    "medium": {
+      "color": { "$type": "color", "$value": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0.2 } },
+      "offsetX": { "$type": "dimension", "$value": { "value": 0, "unit": "px" } },
+      "offsetY": { "$type": "dimension", "$value": { "value": 4, "unit": "px" } },
+      "blur": { "$type": "dimension", "$value": { "value": 8, "unit": "px" } },
+      "spread": { "$type": "dimension", "$value": { "value": 0, "unit": "px" } }
+    }
+  }
+}
+```
+
+Note: Single shadows produce flat sub-tokens. Multiple shadow layers (arrays with 2+ items) use indexed prefixes (`0.color`, `0.offsetX`, ..., `1.color`, etc.). The `inset` property is dropped since variables cannot be applied to inset shadows in Figma.
+
+### Border Token Splitting (Partial)
+
+Border tokens are partially split — only `color` and `width` are extracted. The `style` property is dropped since variables cannot be applied to border style in Figma.
+
+**Input:**
+```json
+{
+  "border": {
+    "$type": "border",
+    "default": {
+      "$value": {
+        "color": { "colorSpace": "srgb", "components": [0.8, 0.8, 0.8] },
+        "width": { "value": 1, "unit": "px" },
+        "style": "solid"
+      }
+    }
+  }
+}
+```
+
+**Output:**
+```json
+{
+  "border": {
+    "default": {
+      "color": { "$type": "color", "$value": { "colorSpace": "srgb", "components": [0.8, 0.8, 0.8], "alpha": 1 } },
+      "width": { "$type": "dimension", "$value": { "value": 1, "unit": "px" } }
+    }
+  }
+}
+```
+
+### Gradient Token Splitting (Partial)
+
+Gradient tokens are partially split — only stop colors are extracted. Stop `position` values are dropped since variables cannot be applied to gradient stop positions in Figma.
+
+**Input:**
+```json
+{
+  "gradient": {
+    "$type": "gradient",
+    "primary": {
+      "$value": [
+        { "color": { "colorSpace": "srgb", "components": [1, 0, 0] }, "position": 0 },
+        { "color": { "colorSpace": "srgb", "components": [0, 0, 1] }, "position": 1 }
+      ]
+    }
+  }
+}
+```
+
+**Output:**
+```json
+{
+  "gradient": {
+    "primary": {
+      "0": { "color": { "$type": "color", "$value": { "colorSpace": "srgb", "components": [1, 0, 0], "alpha": 1 } } },
+      "1": { "color": { "$type": "color", "$value": { "colorSpace": "srgb", "components": [0, 0, 1], "alpha": 1 } } }
+    }
+  }
+}
+```
+
 ## Unsupported Token Types
 
 The following DTCG token types are **not supported** by Figma and will be skipped:
 
-- `shadow`, `border`, `gradient`, `transition`, `strokeStyle`, `cubicBezier`
+- `transition`, `strokeStyle`, `cubicBezier`
 
 ## Alias Handling
 

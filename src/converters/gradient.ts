@@ -1,0 +1,70 @@
+import { PLUGIN_NAME } from '../constants.js';
+import type { ConverterContext, ConverterResult, SubToken } from '../types.js';
+import { getSubTokenAlias, isDTCGGradientValue } from '../utils.js';
+import { convertColor } from './color.js';
+
+/**
+ * Convert a DTCG gradient value to Figma-compatible format.
+ * Gradient tokens are partially split: only stop colors are extracted.
+ * Stop positions are dropped since they can't be represented as Figma variables.
+ */
+export function convertGradient(value: unknown, context: ConverterContext): ConverterResult {
+  if (!isDTCGGradientValue(value)) {
+    context.logger.warn({
+      group: 'plugin',
+      label: PLUGIN_NAME,
+      message: `Token "${context.tokenId}" has invalid gradient value: expected array of gradient stops, got ${typeof value}`,
+    });
+    return { value: undefined, skip: true };
+  }
+
+  const partialAliasOf = context.partialAliasOf;
+  const subTokens: SubToken[] = [];
+  let hasPosition = false;
+
+  for (let i = 0; i < value.length; i++) {
+    const stop = value[i]!;
+
+    if (stop.color !== undefined) {
+      const aliasKey = `${i}.color`;
+      const aliasOf = getSubTokenAlias(partialAliasOf?.[aliasKey], aliasKey, context.allTokens, 'gradient');
+
+      const result = convertColor(stop.color, {
+        ...context,
+        tokenId: `${context.tokenId}.${aliasKey}`,
+      });
+      if (!result.skip) {
+        subTokens.push({
+          idSuffix: aliasKey,
+          $type: 'color',
+          value: result.value,
+          aliasOf,
+        });
+      }
+    }
+
+    if (stop.position !== undefined) {
+      hasPosition = true;
+    }
+  }
+
+  // Log once if any positions were dropped
+  if (hasPosition) {
+    context.logger.info({
+      group: 'plugin',
+      label: PLUGIN_NAME,
+      message: `Token "${context.tokenId}" gradient "position" values dropped (variables cannot be applied to gradient stop positions in Figma)`,
+    });
+  }
+
+  if (subTokens.length === 0) {
+    context.logger.warn({
+      group: 'plugin',
+      label: PLUGIN_NAME,
+      message: `Token "${context.tokenId}" gradient value has no valid color stops`,
+    });
+    return { value: undefined, skip: true };
+  }
+
+  return { value: undefined, split: true, subTokens };
+}

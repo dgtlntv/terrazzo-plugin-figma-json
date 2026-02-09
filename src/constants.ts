@@ -26,6 +26,9 @@ export const SUPPORTED_TYPES = [
   'fontWeight',
   'number',
   'typography',
+  'shadow',
+  'border',
+  'gradient',
 ] as const;
 
 export type SupportedType = (typeof SUPPORTED_TYPES)[number];
@@ -33,7 +36,7 @@ export type SupportedType = (typeof SUPPORTED_TYPES)[number];
 /**
  * Token types that are not supported by Figma and will be dropped with a warning.
  */
-export const UNSUPPORTED_TYPES = ['shadow', 'border', 'gradient', 'transition', 'strokeStyle', 'cubicBezier'] as const;
+export const UNSUPPORTED_TYPES = ['transition', 'strokeStyle', 'cubicBezier'] as const;
 
 export type UnsupportedType = (typeof UNSUPPORTED_TYPES)[number];
 

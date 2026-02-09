@@ -1,50 +1,10 @@
 import { PLUGIN_NAME } from '../constants.js';
 import type { ConverterContext, ConverterResult, SubToken } from '../types.js';
-import { isDTCGTypographyValue } from '../utils.js';
+import { getSubTokenAlias, isDTCGTypographyValue } from '../utils.js';
 import { convertDimension } from './dimension.js';
 import { convertFontFamily } from './font-family.js';
 import { convertFontWeight } from './font-weight.js';
 import { convertLineHeight } from './line-height.js';
-
-/**
- * Get the correct alias reference for a typography sub-property.
- * When a typography property references another typography token,
- * the alias needs to point to the corresponding sub-token.
- *
- * @param aliasOf - The referenced token ID, or undefined if not an alias
- * @param propertyName - The sub-property name (fontFamily, fontSize, etc.)
- * @param allTokens - Map of all tokens for type lookup
- * @returns Adjusted alias target, or undefined if not an alias
- *
- * @example
- * // If typography.base is a typography token:
- * getSubTokenAlias("typography.base", "fontFamily", tokens)
- * // "typography.base.fontFamily"
- *
- * // If dimension.100 is a primitive:
- * getSubTokenAlias("dimension.100", "fontSize", tokens)
- * // "dimension.100" (unchanged)
- */
-function getSubTokenAlias(
-  aliasOf: string | undefined,
-  propertyName: string,
-  allTokens: Record<string, { $type?: string }> | undefined,
-): string | undefined {
-  if (!aliasOf) {
-    return undefined;
-  }
-
-  // Check if the referenced token is a typography token
-  const referencedToken = allTokens?.[aliasOf];
-  if (referencedToken?.$type === 'typography') {
-    // The target is also a typography token that will be split
-    // Append the property name to reference the correct sub-token
-    return `${aliasOf}.${propertyName}`;
-  }
-
-  // Otherwise, return the alias as-is (it's a primitive token)
-  return aliasOf;
-}
 
 /**
  * Convert a DTCG typography value to Figma-compatible format.
@@ -87,7 +47,7 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
 
   // Convert fontFamily
   if (typography.fontFamily !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.fontFamily, 'fontFamily', context.allTokens);
+    const aliasOf = getSubTokenAlias(partialAliasOf?.fontFamily, 'fontFamily', context.allTokens, 'typography');
 
     const result = convertFontFamily(typography.fontFamily, {
       ...context,
@@ -107,7 +67,7 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
   // We also store the resolved fontSize for lineHeight calculation
   let resolvedFontSize: { value: number; unit: string } | undefined;
   if (typography.fontSize !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.fontSize, 'fontSize', context.allTokens);
+    const aliasOf = getSubTokenAlias(partialAliasOf?.fontSize, 'fontSize', context.allTokens, 'typography');
 
     const result = convertDimension(typography.fontSize, {
       ...context,
@@ -126,7 +86,7 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
 
   // Convert fontWeight
   if (typography.fontWeight !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.fontWeight, 'fontWeight', context.allTokens);
+    const aliasOf = getSubTokenAlias(partialAliasOf?.fontWeight, 'fontWeight', context.allTokens, 'typography');
 
     const result = convertFontWeight(typography.fontWeight, {
       ...context,
@@ -164,7 +124,7 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
 
   // Convert letterSpacing (dimension)
   if (typography.letterSpacing !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.letterSpacing, 'letterSpacing', context.allTokens);
+    const aliasOf = getSubTokenAlias(partialAliasOf?.letterSpacing, 'letterSpacing', context.allTokens, 'typography');
 
     const result = convertDimension(typography.letterSpacing, {
       ...context,

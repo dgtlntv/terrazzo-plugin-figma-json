@@ -1,0 +1,147 @@
+{
+  "shadow": {
+    "layered": {
+      "0": {
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": 0.1
+          },
+          "$description": "Layered shadow with two levels"
+        },
+        "offsetX": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "Layered shadow with two levels"
+        },
+        "offsetY": {
+          "$type": "dimension",
+          "$value": {
+            "value": 2,
+            "unit": "px"
+          },
+          "$description": "Layered shadow with two levels"
+        },
+        "blur": {
+          "$type": "dimension",
+          "$value": {
+            "value": 4,
+            "unit": "px"
+          },
+          "$description": "Layered shadow with two levels"
+        },
+        "spread": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "Layered shadow with two levels"
+        }
+      },
+      "1": {
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": 0.2
+          },
+          "$description": "Layered shadow with two levels"
+        },
+        "offsetX": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "Layered shadow with two levels"
+        },
+        "offsetY": {
+          "$type": "dimension",
+          "$value": {
+            "value": 8,
+            "unit": "px"
+          },
+          "$description": "Layered shadow with two levels"
+        },
+        "blur": {
+          "$type": "dimension",
+          "$value": {
+            "value": 16,
+            "unit": "px"
+          },
+          "$description": "Layered shadow with two levels"
+        },
+        "spread": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "Layered shadow with two levels"
+        }
+      }
+    },
+    "small": {
+      "color": {
+        "$type": "color",
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0,
+            0,
+            0
+          ],
+          "alpha": 0.1
+        },
+        "$description": "Small shadow for cards"
+      },
+      "offsetX": {
+        "$type": "dimension",
+        "$value": {
+          "value": 0,
+          "unit": "px"
+        },
+        "$description": "Small shadow for cards"
+      },
+      "offsetY": {
+        "$type": "dimension",
+        "$value": {
+          "value": 2,
+          "unit": "px"
+        },
+        "$description": "Small shadow for cards"
+      },
+      "blur": {
+        "$type": "dimension",
+        "$value": {
+          "value": 4,
+          "unit": "px"
+        },
+        "$description": "Small shadow for cards"
+      },
+      "spread": {
+        "$type": "dimension",
+        "$value": {
+          "value": 0,
+          "unit": "px"
+        },
+        "$description": "Small shadow for cards"
+      }
+    }
+  }
+}

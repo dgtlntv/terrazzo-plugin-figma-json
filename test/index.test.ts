@@ -68,6 +68,23 @@ describe('figma-json plugin', () => {
     );
   });
 
+  it('shadow token splitting', async () => {
+    const contents = await runPlugin('./fixtures/shadow/');
+    await expect(contents).toMatchFileSnapshot(fileURLToPath(new URL('./fixtures/shadow/want.json', import.meta.url)));
+  });
+
+  it('border token splitting', async () => {
+    const contents = await runPlugin('./fixtures/border/');
+    await expect(contents).toMatchFileSnapshot(fileURLToPath(new URL('./fixtures/border/want.json', import.meta.url)));
+  });
+
+  it('gradient token splitting', async () => {
+    const contents = await runPlugin('./fixtures/gradient/');
+    await expect(contents).toMatchFileSnapshot(
+      fileURLToPath(new URL('./fixtures/gradient/want.json', import.meta.url)),
+    );
+  });
+
   it('respects exclude option', async () => {
     const output = 'actual.json';
     const cwd = new URL('./fixtures/basic/', import.meta.url);

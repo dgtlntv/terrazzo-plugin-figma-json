@@ -1,10 +1,13 @@
 import type { Resolver } from '@terrazzo/parser';
 import wcmatch from 'wildcard-match';
-import { INTERNAL_KEYS } from './constants.js';
+import { INTERNAL_KEYS, type SupportedType } from './constants.js';
 import type {
+  DTCGBorderValue,
   DTCGColorValue,
   DTCGDimensionValue,
   DTCGDurationValue,
+  DTCGGradientStop,
+  DTCGShadowValue,
   DTCGTypographyValue,
   PartialAliasOf,
   TokenWithPartialAlias,
@@ -161,4 +164,60 @@ export function isDTCGDurationValue(value: unknown): value is DTCGDurationValue 
  */
 export function isDTCGTypographyValue(value: unknown): value is DTCGTypographyValue {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Type guard to validate DTCGShadowValue structure.
+ * Accepts a single shadow object or an array of shadow objects.
+ */
+export function isDTCGShadowValue(value: unknown): value is DTCGShadowValue | DTCGShadowValue[] {
+  if (Array.isArray(value)) {
+    return value.length > 0 && value.every((item) => item !== null && typeof item === 'object');
+  }
+  return value !== null && typeof value === 'object';
+}
+
+/**
+ * Type guard to validate DTCGBorderValue structure.
+ * Only checks that it's an object - individual properties are validated during conversion.
+ */
+export function isDTCGBorderValue(value: unknown): value is DTCGBorderValue {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Type guard to validate DTCGGradientValue structure.
+ * Checks that it's an array of gradient stops.
+ */
+export function isDTCGGradientValue(value: unknown): value is DTCGGradientStop[] {
+  return Array.isArray(value) && value.length > 0 && value.every((item) => item !== null && typeof item === 'object');
+}
+
+/**
+ * Get the correct alias reference for a composite sub-property.
+ * When a composite property references another composite token of the same type,
+ * the alias needs to point to the corresponding sub-token.
+ *
+ * @param aliasOf - The referenced token ID, or undefined if not an alias
+ * @param propertyName - The sub-property name (e.g., fontFamily, color, offsetX)
+ * @param allTokens - Map of all tokens for type lookup
+ * @param parentType - The composite token type (e.g., 'typography', 'shadow', 'border', 'gradient')
+ * @returns Adjusted alias target, or undefined if not an alias
+ */
+export function getSubTokenAlias(
+  aliasOf: string | undefined,
+  propertyName: string,
+  allTokens: Record<string, { $type?: string }> | undefined,
+  parentType: SupportedType,
+): string | undefined {
+  if (!aliasOf) {
+    return undefined;
+  }
+
+  const referencedToken = allTokens?.[aliasOf];
+  if (referencedToken?.$type === parentType) {
+    return `${aliasOf}.${propertyName}`;
+  }
+
+  return aliasOf;
 }

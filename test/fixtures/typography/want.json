@@ -6,5 +6,145 @@
         "$value": "Inter"
       }
     }
+  },
+  "typography": {
+    "body": {
+      "default": {
+        "fontFamily": {
+          "$type": "fontFamily",
+          "$value": "Inter",
+          "$description": "Default body text"
+        },
+        "fontSize": {
+          "$type": "dimension",
+          "$value": {
+            "value": 16,
+            "unit": "px"
+          },
+          "$description": "Default body text"
+        },
+        "fontWeight": {
+          "$type": "number",
+          "$value": 400,
+          "$description": "Default body text"
+        },
+        "lineHeight": {
+          "$type": "dimension",
+          "$value": {
+            "value": 24,
+            "unit": "px"
+          },
+          "$description": "Default body text"
+        },
+        "letterSpacing": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "Default body text"
+        }
+      },
+      "small": {
+        "fontFamily": {
+          "$type": "fontFamily",
+          "$value": "Inter"
+        },
+        "fontSize": {
+          "$type": "dimension",
+          "$value": {
+            "value": 14,
+            "unit": "px"
+          }
+        },
+        "fontWeight": {
+          "$type": "number",
+          "$value": 400
+        },
+        "lineHeight": {
+          "$type": "dimension",
+          "$value": {
+            "value": 20,
+            "unit": "px"
+          }
+        },
+        "letterSpacing": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          }
+        }
+      }
+    },
+    "heading": {
+      "large": {
+        "fontFamily": {
+          "$type": "fontFamily",
+          "$value": "Inter",
+          "$description": "Large heading style"
+        },
+        "fontSize": {
+          "$type": "dimension",
+          "$value": {
+            "value": 32,
+            "unit": "px"
+          },
+          "$description": "Large heading style"
+        },
+        "fontWeight": {
+          "$type": "number",
+          "$value": 700,
+          "$description": "Large heading style"
+        },
+        "lineHeight": {
+          "$type": "dimension",
+          "$value": {
+            "value": 38,
+            "unit": "px"
+          },
+          "$description": "Large heading style"
+        },
+        "letterSpacing": {
+          "$type": "dimension",
+          "$value": {
+            "value": -0.5,
+            "unit": "px"
+          },
+          "$description": "Large heading style"
+        }
+      },
+      "medium": {
+        "fontFamily": {
+          "$type": "fontFamily",
+          "$value": "Roboto"
+        },
+        "fontSize": {
+          "$type": "dimension",
+          "$value": {
+            "value": 24,
+            "unit": "px"
+          }
+        },
+        "fontWeight": {
+          "$type": "number",
+          "$value": 700
+        },
+        "lineHeight": {
+          "$type": "dimension",
+          "$value": {
+            "value": 31,
+            "unit": "px"
+          }
+        },
+        "letterSpacing": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          }
+        }
+      }
+    }
   }
 }

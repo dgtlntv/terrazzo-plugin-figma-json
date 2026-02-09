@@ -335,18 +335,26 @@ export default function buildFigmaJson({
 
     const output: Record<string, unknown> = {};
     for (const transform of transforms) {
-      if (!transform.token) {
-        continue;
-      }
-
-      const tokenId = transform.token.id;
-      if (shouldExclude(tokenId)) {
-        continue;
-      }
-
-      const outputName = tokenName?.(transform.token) ?? tokenId;
       const parsedValue = parseTransformValue(transform.value);
       if (!parsedValue) {
+        continue;
+      }
+
+      let tokenId: string;
+      let outputName: string;
+
+      if (transform.token) {
+        tokenId = transform.token.id;
+        outputName = tokenName?.(transform.token) ?? tokenId;
+      } else if (parsedValue[INTERNAL_KEYS.SPLIT_FROM] && parsedValue[INTERNAL_KEYS.TOKEN_ID]) {
+        // Split sub-token (e.g., typography, shadow, border, gradient)
+        tokenId = parsedValue[INTERNAL_KEYS.TOKEN_ID];
+        outputName = tokenId;
+      } else {
+        continue;
+      }
+
+      if (shouldExclude(tokenId)) {
         continue;
       }
 

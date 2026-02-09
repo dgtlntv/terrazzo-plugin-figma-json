@@ -34,6 +34,39 @@ describe('edge cases', () => {
 
   it('handles all unsupported types', async () => {
     const tokens = {
+      transition: {
+        $type: 'transition',
+        test: {
+          $value: {
+            duration: { value: 200, unit: 'ms' },
+            delay: { value: 0, unit: 'ms' },
+            timingFunction: [0.42, 0, 0.58, 1],
+          },
+        },
+      },
+      stroke: {
+        $type: 'strokeStyle',
+        test: {
+          $value: 'dashed',
+        },
+      },
+      easing: {
+        $type: 'cubicBezier',
+        test: {
+          $value: [0.42, 0, 0.58, 1],
+        },
+      },
+    };
+
+    const contents = await runPluginWithSource(JSON.stringify(tokens), { warnOnUnsupported: false });
+    const parsed = JSON.parse(contents ?? '{}');
+
+    // All unsupported types should be filtered out
+    expect(parsed).toEqual({});
+  });
+
+  it('splits shadow tokens into sub-tokens', async () => {
+    const tokens = {
       shadow: {
         $type: 'shadow',
         test: {
@@ -46,6 +79,23 @@ describe('edge cases', () => {
           },
         },
       },
+    };
+
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
+    const parsed = JSON.parse(contents ?? '{}');
+
+    // Single shadows have no index prefix for cleaner output
+    expect(parsed.shadow.test.color.$type).toBe('color');
+    expect(parsed.shadow.test.color.$value.colorSpace).toBe('srgb');
+    expect(parsed.shadow.test.offsetX.$type).toBe('dimension');
+    expect(parsed.shadow.test.offsetX.$value).toEqual({ value: 0, unit: 'px' });
+    expect(parsed.shadow.test.offsetY.$value).toEqual({ value: 4, unit: 'px' });
+    expect(parsed.shadow.test.blur.$value).toEqual({ value: 8, unit: 'px' });
+    expect(parsed.shadow.test.spread.$value).toEqual({ value: 0, unit: 'px' });
+  });
+
+  it('splits border tokens into sub-tokens (color + width only)', async () => {
+    const tokens = {
       border: {
         $type: 'border',
         test: {
@@ -56,6 +106,20 @@ describe('edge cases', () => {
           },
         },
       },
+    };
+
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
+    const parsed = JSON.parse(contents ?? '{}');
+
+    expect(parsed.border.test.color.$type).toBe('color');
+    expect(parsed.border.test.width.$type).toBe('dimension');
+    expect(parsed.border.test.width.$value).toEqual({ value: 1, unit: 'px' });
+    // style should be dropped
+    expect(parsed.border.test.style).toBeUndefined();
+  });
+
+  it('splits gradient tokens into color sub-tokens', async () => {
+    const tokens = {
       gradient: {
         $type: 'gradient',
         test: {
@@ -67,11 +131,13 @@ describe('edge cases', () => {
       },
     };
 
-    const contents = await runPluginWithSource(JSON.stringify(tokens), { warnOnUnsupported: false });
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
     const parsed = JSON.parse(contents ?? '{}');
 
-    // All unsupported types should be filtered out
-    expect(parsed).toEqual({});
+    expect(parsed.gradient.test['0'].color.$type).toBe('color');
+    expect(parsed.gradient.test['0'].color.$value.components).toEqual([1, 0, 0]);
+    expect(parsed.gradient.test['1'].color.$type).toBe('color');
+    expect(parsed.gradient.test['1'].color.$value.components).toEqual([0, 0, 1]);
   });
 
   it('handles deeply nested groups (3+ levels)', async () => {
@@ -232,15 +298,13 @@ describe('edge cases', () => {
         },
       },
       unsupported: {
-        shadow: {
-          $type: 'shadow',
+        transition: {
+          $type: 'transition',
           test: {
             $value: {
-              offsetX: { value: 0, unit: 'px' },
-              offsetY: { value: 4, unit: 'px' },
-              blur: { value: 8, unit: 'px' },
-              spread: { value: 0, unit: 'px' },
-              color: { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.2 },
+              duration: { value: 200, unit: 'ms' },
+              delay: { value: 0, unit: 'ms' },
+              timingFunction: [0.42, 0, 0.58, 1],
             },
           },
         },

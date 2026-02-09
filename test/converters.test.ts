@@ -1,13 +1,16 @@
 import type { TokenNormalized } from '@terrazzo/parser';
 import { describe, expect, it, vi } from 'vitest';
+import { convertBorder } from '../src/converters/border.js';
 import { convertColor } from '../src/converters/color.js';
 import { convertDimension } from '../src/converters/dimension.js';
 import { convertDuration } from '../src/converters/duration.js';
 import { convertFontFamily } from '../src/converters/font-family.js';
 import { convertFontWeight } from '../src/converters/font-weight.js';
+import { convertGradient } from '../src/converters/gradient.js';
 import type { LineHeightConverterContext } from '../src/converters/line-height.js';
 import { convertLineHeight } from '../src/converters/line-height.js';
 import { convertNumber } from '../src/converters/number.js';
+import { convertShadow } from '../src/converters/shadow.js';
 import { convertTypography } from '../src/converters/typography.js';
 import type { ConverterContext } from '../src/types.js';
 
@@ -802,5 +805,429 @@ describe('convertTypography', () => {
     // Primitive references stay as-is
     expect(fontSizeToken?.aliasOf).toBe('dimension.size.100');
     expect(fontWeightToken?.aliasOf).toBe('typography.weight.bold');
+  });
+});
+
+describe('convertShadow', () => {
+  it('splits single shadow object into sub-tokens', () => {
+    const ctx = createContext();
+    const result = convertShadow(
+      {
+        color: { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.2 },
+        offsetX: { value: 0, unit: 'px' },
+        offsetY: { value: 4, unit: 'px' },
+        blur: { value: 8, unit: 'px' },
+        spread: { value: 0, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(5);
+
+    const colorToken = result.subTokens?.find((t) => t.idSuffix === 'color');
+    expect(colorToken?.$type).toBe('color');
+    expect(colorToken?.value).toHaveProperty('colorSpace', 'srgb');
+
+    const offsetXToken = result.subTokens?.find((t) => t.idSuffix === 'offsetX');
+    expect(offsetXToken?.$type).toBe('dimension');
+    expect(offsetXToken?.value).toEqual({ value: 0, unit: 'px' });
+
+    const offsetYToken = result.subTokens?.find((t) => t.idSuffix === 'offsetY');
+    expect(offsetYToken?.value).toEqual({ value: 4, unit: 'px' });
+
+    const blurToken = result.subTokens?.find((t) => t.idSuffix === 'blur');
+    expect(blurToken?.value).toEqual({ value: 8, unit: 'px' });
+
+    const spreadToken = result.subTokens?.find((t) => t.idSuffix === 'spread');
+    expect(spreadToken?.value).toEqual({ value: 0, unit: 'px' });
+  });
+
+  it('splits array of shadows into indexed sub-tokens', () => {
+    const ctx = createContext();
+    const result = convertShadow(
+      [
+        {
+          color: { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.1 },
+          offsetX: { value: 0, unit: 'px' },
+          offsetY: { value: 2, unit: 'px' },
+          blur: { value: 4, unit: 'px' },
+          spread: { value: 0, unit: 'px' },
+        },
+        {
+          color: { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.2 },
+          offsetX: { value: 0, unit: 'px' },
+          offsetY: { value: 8, unit: 'px' },
+          blur: { value: 16, unit: 'px' },
+          spread: { value: 0, unit: 'px' },
+        },
+      ],
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(10);
+
+    // First layer
+    expect(result.subTokens?.find((t) => t.idSuffix === '0.color')?.$type).toBe('color');
+    expect(result.subTokens?.find((t) => t.idSuffix === '0.offsetY')?.value).toEqual({ value: 2, unit: 'px' });
+    expect(result.subTokens?.find((t) => t.idSuffix === '0.blur')?.value).toEqual({ value: 4, unit: 'px' });
+
+    // Second layer
+    expect(result.subTokens?.find((t) => t.idSuffix === '1.color')?.$type).toBe('color');
+    expect(result.subTokens?.find((t) => t.idSuffix === '1.offsetY')?.value).toEqual({ value: 8, unit: 'px' });
+    expect(result.subTokens?.find((t) => t.idSuffix === '1.blur')?.value).toEqual({ value: 16, unit: 'px' });
+  });
+
+  it('drops inset property and logs info', () => {
+    const ctx = createContext();
+    const result = convertShadow(
+      {
+        color: { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.2 },
+        offsetX: { value: 0, unit: 'px' },
+        offsetY: { value: 4, unit: 'px' },
+        blur: { value: 8, unit: 'px' },
+        spread: { value: 0, unit: 'px' },
+        inset: true,
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    // inset should not appear as a sub-token
+    expect(result.subTokens?.find((t) => t.idSuffix === 'inset')).toBeUndefined();
+    expect(ctx.logger.info).toHaveBeenCalled();
+  });
+
+  it('warns and skips invalid shadow value', () => {
+    const ctx = createContext();
+    const result = convertShadow('not an object', ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('warns and skips shadow with no valid sub-properties', () => {
+    const ctx = createContext();
+    const result = convertShadow({}, ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('handles partial shadow properties', () => {
+    const ctx = createContext();
+    const result = convertShadow(
+      {
+        color: { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.5 },
+        blur: { value: 4, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(2);
+    expect(result.subTokens?.map((t) => t.idSuffix)).toEqual(['color', 'blur']);
+  });
+
+  it('converts non-sRGB shadow colors', () => {
+    const ctx = createContext();
+    const result = convertShadow(
+      {
+        color: { colorSpace: 'oklch', components: [0.5, 0.1, 180] },
+        offsetX: { value: 0, unit: 'px' },
+        offsetY: { value: 4, unit: 'px' },
+        blur: { value: 8, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    const colorToken = result.subTokens?.find((t) => t.idSuffix === 'color');
+    expect(colorToken?.value).toHaveProperty('colorSpace', 'srgb');
+  });
+
+  it('converts rem dimensions in shadow', () => {
+    const ctx = createContext();
+    const result = convertShadow(
+      {
+        offsetX: { value: 0, unit: 'px' },
+        offsetY: { value: 0.25, unit: 'rem' },
+        blur: { value: 0.5, unit: 'rem' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens?.find((t) => t.idSuffix === 'offsetY')?.value).toEqual({ value: 4, unit: 'px' });
+    expect(result.subTokens?.find((t) => t.idSuffix === 'blur')?.value).toEqual({ value: 8, unit: 'px' });
+  });
+
+  it('preserves aliasOf for primitive token references', () => {
+    const ctx = createContext({
+      partialAliasOf: {
+        color: 'color.shadow-color',
+        offsetY: 'dimension.shadow-offset',
+      },
+      allTokens: {
+        'color.shadow-color': { $type: 'color' } as TokenNormalized,
+        'dimension.shadow-offset': { $type: 'dimension' } as TokenNormalized,
+      },
+    });
+    const result = convertShadow(
+      {
+        color: { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.2 },
+        offsetY: { value: 4, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens?.find((t) => t.idSuffix === 'color')?.aliasOf).toBe('color.shadow-color');
+    expect(result.subTokens?.find((t) => t.idSuffix === 'offsetY')?.aliasOf).toBe('dimension.shadow-offset');
+  });
+});
+
+describe('convertBorder', () => {
+  it('splits border into color and width sub-tokens', () => {
+    const ctx = createContext();
+    const result = convertBorder(
+      {
+        color: { colorSpace: 'srgb', components: [0.8, 0.8, 0.8] },
+        width: { value: 1, unit: 'px' },
+        style: 'solid',
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(2);
+
+    const colorToken = result.subTokens?.find((t) => t.idSuffix === 'color');
+    expect(colorToken?.$type).toBe('color');
+
+    const widthToken = result.subTokens?.find((t) => t.idSuffix === 'width');
+    expect(widthToken?.$type).toBe('dimension');
+    expect(widthToken?.value).toEqual({ value: 1, unit: 'px' });
+  });
+
+  it('drops style property and logs info', () => {
+    const ctx = createContext();
+    convertBorder(
+      {
+        color: { colorSpace: 'srgb', components: [0, 0, 0] },
+        width: { value: 1, unit: 'px' },
+        style: 'dashed',
+      },
+      ctx,
+    );
+
+    expect(ctx.logger.info).toHaveBeenCalled();
+  });
+
+  it('handles border with only color', () => {
+    const ctx = createContext();
+    const result = convertBorder(
+      {
+        color: { colorSpace: 'srgb', components: [0, 0, 0] },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(1);
+    expect(result.subTokens?.[0]?.idSuffix).toBe('color');
+  });
+
+  it('handles border with only width', () => {
+    const ctx = createContext();
+    const result = convertBorder(
+      {
+        width: { value: 2, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(1);
+    expect(result.subTokens?.[0]?.idSuffix).toBe('width');
+  });
+
+  it('warns and skips invalid border value', () => {
+    const ctx = createContext();
+    const result = convertBorder('not an object', ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('warns and skips border with no valid sub-properties', () => {
+    const ctx = createContext();
+    const result = convertBorder({ style: 'solid' }, ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('preserves aliasOf for primitive token references', () => {
+    const ctx = createContext({
+      partialAliasOf: {
+        color: 'color.border-color',
+        width: 'dimension.border-width',
+      },
+      allTokens: {
+        'color.border-color': { $type: 'color' } as TokenNormalized,
+        'dimension.border-width': { $type: 'dimension' } as TokenNormalized,
+      },
+    });
+    const result = convertBorder(
+      {
+        color: { colorSpace: 'srgb', components: [0, 0, 0] },
+        width: { value: 1, unit: 'px' },
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens?.find((t) => t.idSuffix === 'color')?.aliasOf).toBe('color.border-color');
+    expect(result.subTokens?.find((t) => t.idSuffix === 'width')?.aliasOf).toBe('dimension.border-width');
+  });
+
+  it('skips invalid sub-properties but includes valid ones', () => {
+    const ctx = createContext();
+    const result = convertBorder(
+      {
+        color: { colorSpace: 'srgb', components: [0, 0, 0] },
+        width: { value: Infinity, unit: 'px' }, // Invalid
+      },
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(1);
+    expect(result.subTokens?.[0]?.idSuffix).toBe('color');
+  });
+});
+
+describe('convertGradient', () => {
+  it('splits 2-stop gradient into indexed color sub-tokens', () => {
+    const ctx = createContext();
+    const result = convertGradient(
+      [
+        { color: { colorSpace: 'srgb', components: [1, 0, 0] }, position: 0 },
+        { color: { colorSpace: 'srgb', components: [0, 0, 1] }, position: 1 },
+      ],
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(2);
+
+    expect(result.subTokens?.[0]?.idSuffix).toBe('0.color');
+    expect(result.subTokens?.[0]?.$type).toBe('color');
+    expect(result.subTokens?.[0]?.value).toHaveProperty('colorSpace', 'srgb');
+
+    expect(result.subTokens?.[1]?.idSuffix).toBe('1.color');
+    expect(result.subTokens?.[1]?.$type).toBe('color');
+  });
+
+  it('splits 3+-stop gradient into indexed color sub-tokens', () => {
+    const ctx = createContext();
+    const result = convertGradient(
+      [
+        { color: { colorSpace: 'srgb', components: [1, 0, 0] }, position: 0 },
+        { color: { colorSpace: 'srgb', components: [0, 1, 0] }, position: 0.5 },
+        { color: { colorSpace: 'srgb', components: [0, 0, 1] }, position: 1 },
+      ],
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(3);
+    expect(result.subTokens?.map((t) => t.idSuffix)).toEqual(['0.color', '1.color', '2.color']);
+  });
+
+  it('drops position values and logs info', () => {
+    const ctx = createContext();
+    convertGradient(
+      [
+        { color: { colorSpace: 'srgb', components: [1, 0, 0] }, position: 0 },
+        { color: { colorSpace: 'srgb', components: [0, 0, 1] }, position: 1 },
+      ],
+      ctx,
+    );
+
+    expect(ctx.logger.info).toHaveBeenCalled();
+  });
+
+  it('warns and skips invalid gradient value', () => {
+    const ctx = createContext();
+    const result = convertGradient('not an array', ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('warns and skips empty gradient array', () => {
+    const ctx = createContext();
+    const result = convertGradient([], ctx);
+
+    expect(result.skip).toBe(true);
+    expect(ctx.logger.warn).toHaveBeenCalled();
+  });
+
+  it('handles gradient stops without position', () => {
+    const ctx = createContext();
+    const result = convertGradient(
+      [
+        { color: { colorSpace: 'srgb', components: [1, 0, 0] } },
+        { color: { colorSpace: 'srgb', components: [0, 0, 1] } },
+      ],
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens).toHaveLength(2);
+    // No info log about positions being dropped since there are none
+    expect(ctx.logger.info).not.toHaveBeenCalled();
+  });
+
+  it('converts non-sRGB gradient colors', () => {
+    const ctx = createContext();
+    const result = convertGradient(
+      [
+        { color: { colorSpace: 'oklch', components: [0.5, 0.1, 0] }, position: 0 },
+        { color: { colorSpace: 'oklch', components: [0.8, 0.1, 180] }, position: 1 },
+      ],
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens?.[0]?.value).toHaveProperty('colorSpace', 'srgb');
+    expect(result.subTokens?.[1]?.value).toHaveProperty('colorSpace', 'srgb');
+  });
+
+  it('preserves aliasOf for primitive token references', () => {
+    const ctx = createContext({
+      partialAliasOf: {
+        '0.color': 'color.start',
+        '1.color': 'color.end',
+      },
+      allTokens: {
+        'color.start': { $type: 'color' } as TokenNormalized,
+        'color.end': { $type: 'color' } as TokenNormalized,
+      },
+    });
+    const result = convertGradient(
+      [
+        { color: { colorSpace: 'srgb', components: [1, 0, 0] }, position: 0 },
+        { color: { colorSpace: 'srgb', components: [0, 0, 1] }, position: 1 },
+      ],
+      ctx,
+    );
+
+    expect(result.split).toBe(true);
+    expect(result.subTokens?.find((t) => t.idSuffix === '0.color')?.aliasOf).toBe('color.start');
+    expect(result.subTokens?.find((t) => t.idSuffix === '1.color')?.aliasOf).toBe('color.end');
   });
 });

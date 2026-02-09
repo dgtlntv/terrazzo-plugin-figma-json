@@ -198,6 +198,36 @@ export interface DTCGTypographyValue {
 }
 
 /**
+ * Shadow value structure in DTCG format.
+ * Can be a single shadow object or an array of shadow layers.
+ */
+export interface DTCGShadowValue {
+  color?: DTCGColorValue;
+  offsetX?: DTCGDimensionValue;
+  offsetY?: DTCGDimensionValue;
+  blur?: DTCGDimensionValue;
+  spread?: DTCGDimensionValue;
+  inset?: boolean;
+}
+
+/**
+ * Border value structure in DTCG format.
+ */
+export interface DTCGBorderValue {
+  color?: DTCGColorValue;
+  width?: DTCGDimensionValue;
+  style?: string;
+}
+
+/**
+ * Gradient stop structure in DTCG format.
+ */
+export interface DTCGGradientStop {
+  color?: DTCGColorValue;
+  position?: number;
+}
+
+/**
  * Figma variable types.
  */
 export type FigmaVariableType = 'Color' | 'Number' | 'String' | 'Boolean';
