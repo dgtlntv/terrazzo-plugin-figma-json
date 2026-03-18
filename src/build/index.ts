@@ -1,7 +1,7 @@
 import type { TokenNormalized } from '@terrazzo/parser';
 import { FORMAT_ID } from '../constants.js';
-import { createExcludeMatcher } from '../utils.js';
-import { getDefaultInput, isDefaultResolver } from './helpers.js';
+import { createExcludeMatcher, getDefaultInput } from '../utils.js';
+import { isDefaultResolver } from './helpers.js';
 import { processTransform } from './output.js';
 import { buildTokenSourceMaps } from './source-maps.js';
 import type { BuildOptions, SourceInfo } from './types.js';

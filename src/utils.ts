@@ -1,3 +1,4 @@
+import type { Resolver } from '@terrazzo/parser';
 import wcmatch from 'wildcard-match';
 import type {
   DTCGBorderValue,
@@ -183,4 +184,19 @@ export function isDTCGBorderValue(value: unknown): value is DTCGBorderValue {
  */
 export function isDTCGGradientValue(value: unknown): value is DTCGGradientStop[] {
   return Array.isArray(value) && value.length > 0 && value.every((item) => item !== null && typeof item === 'object');
+}
+
+/**
+ * Build a default input from the resolver's first permutation.
+ *
+ * @param resolver - The terrazzo resolver instance
+ * @returns The first permutation input object, or an empty object if none exist
+ */
+export function getDefaultInput(resolver: Resolver): Record<string, string> {
+  return Object.fromEntries(
+    resolver.source.resolutionOrder
+      .filter((m) => m.type === 'modifier')
+      .map((m) => [m.name, m.default ?? Object.keys(m.contexts)[0]])
+      .filter(([, v]) => v !== undefined),
+  );
 }
