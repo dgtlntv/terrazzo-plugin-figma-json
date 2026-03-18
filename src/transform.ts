@@ -91,8 +91,55 @@ function transformToken(
 }
 
 /**
+ * Collect the minimal set of resolver inputs that the build step will query.
+ *
+ * The build step requests transforms for:
+ *   1. The default input (first permutation — all modifier defaults)
+ *   2. One input per individual modifier context (default + one override)
+ *
+ * This avoids the cartesian-product explosion from listPermutations().
+ * For example, 8 modifiers with ~4 contexts each produce ~40k full
+ * permutations but only ~30 targeted inputs.
+ */
+function collectBuildInputs(resolver: TransformHookOptions['resolver']): Record<string, string>[] {
+  const permutations = resolver.listPermutations();
+  const defaultInput: Record<string, string> = permutations[0] ?? {};
+  const inputs: Record<string, string>[] = [defaultInput];
+
+  const resolverSource = resolver.source;
+  if (!resolverSource?.modifiers) {
+    return inputs;
+  }
+
+  for (const [modifierName, modifier] of Object.entries(resolverSource.modifiers)) {
+    if (!modifier.contexts) {
+      continue;
+    }
+    // Skip the auto-generated tzMode modifier with only "." context
+    if (modifierName === 'tzMode') {
+      const contextNames = Object.keys(modifier.contexts);
+      if (contextNames.length === 1 && contextNames[0] === '.') {
+        continue;
+      }
+    }
+    for (const contextName of Object.keys(modifier.contexts)) {
+      // Skip if this is already the default value for this modifier
+      if (defaultInput[modifierName] === contextName) {
+        continue;
+      }
+      inputs.push({ ...defaultInput, [modifierName]: contextName });
+    }
+  }
+
+  return inputs;
+}
+
+/**
  * Transform DTCG tokens into Figma-compatible format.
- * Uses the resolver to iterate all permutations and convert token values.
+ *
+ * Only iterates the minimal set of resolver inputs that the build step
+ * will actually query (default + one per modifier context), avoiding
+ * the combinatorial explosion of the full permutation set.
  *
  * @param options - Transform options containing the transform hook context and plugin options
  */
@@ -101,15 +148,13 @@ export default function transformFigmaJson({ transform, options }: TransformOpti
 
   const shouldExclude = createExcludeMatcher(options.exclude);
 
-  const permutations = resolver.listPermutations();
+  const inputs = collectBuildInputs(resolver);
 
-  // Process each permutation (context combination)
-  for (const input of permutations) {
-    // Skip empty permutations — when there are no tokens, the resolver may
-    // have an empty permutation that fails on apply()
+  for (const input of inputs) {
     if (Object.keys(input).length === 0) {
       continue;
     }
+
     const contextTokens = resolver.apply(input);
 
     for (const token of Object.values(contextTokens)) {
