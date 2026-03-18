@@ -2,7 +2,7 @@ import type { TokenNormalized, TransformHookOptions } from '@terrazzo/parser';
 import { FORMAT_ID, PLUGIN_NAME } from './constants.js';
 import { convertToken } from './converters/index.js';
 import type { FigmaJsonPluginOptions } from './types.js';
-import { createExcludeMatcher, toFigmaLocalID } from './utils.js';
+import { createExcludeMatcher, getDefaultInput, toFigmaLocalID } from './utils.js';
 
 export interface TransformOptions {
   transform: TransformHookOptions;
@@ -102,8 +102,7 @@ function transformToken(
  * permutations but only ~30 targeted inputs.
  */
 function collectBuildInputs(resolver: TransformHookOptions['resolver']): Record<string, string>[] {
-  const permutations = resolver.listPermutations();
-  const defaultInput: Record<string, string> = permutations[0] ?? {};
+  const defaultInput: Record<string, string> = getDefaultInput(resolver);
   const inputs: Record<string, string>[] = [defaultInput];
 
   const resolverSource = resolver.source;
@@ -124,7 +123,7 @@ function collectBuildInputs(resolver: TransformHookOptions['resolver']): Record<
     }
     for (const contextName of Object.keys(modifier.contexts)) {
       // Skip if this is already the default value for this modifier
-      if (defaultInput[modifierName] === contextName) {
+      if ( contextName === modifier.default) {
         continue;
       }
       inputs.push({ ...defaultInput, [modifierName]: contextName });

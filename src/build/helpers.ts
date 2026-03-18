@@ -80,17 +80,6 @@ export function isDefaultResolver(resolverSource: NonNullable<Resolver['source']
 }
 
 /**
- * Build a default input from the resolver's first permutation.
- *
- * @param resolver - The terrazzo resolver instance
- * @returns The first permutation input object, or an empty object if none exist
- */
-export function getDefaultInput(resolver: Resolver): Record<string, string> {
-  const permutations = resolver.listPermutations();
-  return permutations[0] ?? {};
-}
-
-/**
  * Return a new ParsedTokenValue with $description and filtered $extensions added.
  *
  * @param parsedValue - The parsed token value to augment
