@@ -1,5 +1,5 @@
 import type { TokenNormalized, TransformHookOptions } from '@terrazzo/parser';
-import { FORMAT_ID } from './constants.js';
+import { FORMAT_ID, PLUGIN_NAME } from './constants.js';
 import { convertToken } from './converters/index.js';
 import type { FigmaJsonPluginOptions } from './types.js';
 import { createExcludeMatcher, toFigmaLocalID } from './utils.js';
@@ -114,6 +114,18 @@ export default function transformFigmaJson({ transform, options }: TransformOpti
 
     for (const token of Object.values(contextTokens)) {
       if (shouldExclude(token.id)) {
+        continue;
+      }
+
+      // Skip tokens that only exist in this modifier context but not in the
+      // base token set.  Terrazzo's setTransform() validates against the base
+      // set and throws a fatal error for unknown IDs.
+      if (!(token.id in rawTokens)) {
+        context.logger.warn({
+          group: 'plugin',
+          label: PLUGIN_NAME,
+          message: `Token "${token.id}" exists only in a non-default modifier context and is not present in the base token set. Skipping — Terrazzo does not support setTransform() for context-only tokens.`,
+        });
         continue;
       }
 
