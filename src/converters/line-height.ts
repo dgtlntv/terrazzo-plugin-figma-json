@@ -53,6 +53,10 @@ export interface LineHeightConverterContext extends ConverterContext {
  * // lineHeight: 1.5, fontSize: { value: 16, unit: "px" }
  * convertLineHeight(1.5, { ...context, fontSize: { value: 16, unit: "px" } });
  * // Output: { value: { value: 24, unit: "px" } }
+ *
+ * @param value - The DTCG lineHeight value (unitless number multiplier)
+ * @param context - Extended converter context including the resolved fontSize for calculation
+ * @returns Dimension value in px (multiplier × fontSize), or skip indicator if fontSize is missing or value is invalid
  */
 export function convertLineHeight(value: unknown, context: LineHeightConverterContext): ConverterResult {
   // W3C DTCG specifies lineHeight as a number (unitless multiplier)

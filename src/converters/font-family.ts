@@ -14,6 +14,10 @@ import type { ConverterContext, ConverterResult } from '../types.js';
  * // Arrays are truncated to the first element
  * convertFontFamily(["Inter", "Helvetica", "sans-serif"], context);
  * // => { value: "Inter" } (with warning about dropped fallbacks)
+ *
+ * @param value - The DTCG fontFamily value (string or string array)
+ * @param context - Converter context with logger and plugin options
+ * @returns Single font family string, or skip indicator for invalid values
  */
 export function convertFontFamily(value: unknown, context: ConverterContext): ConverterResult {
   // String passthrough

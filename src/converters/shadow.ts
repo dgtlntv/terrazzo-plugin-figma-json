@@ -1,6 +1,6 @@
 import { PLUGIN_NAME } from '../constants.js';
 import type { ConverterContext, ConverterResult, DTCGShadowValue, SubToken } from '../types.js';
-import { getSubTokenAlias, isDTCGShadowValue } from '../utils.js';
+import { isDTCGShadowValue } from '../utils.js';
 import { convertColor } from './color.js';
 import { convertDimension } from './dimension.js';
 
@@ -10,109 +10,68 @@ import { convertDimension } from './dimension.js';
  * @param shadow - The shadow value object
  * @param prefix - Prefix for sub-token IDs (empty for single, "0." for arrays)
  * @param context - Converter context
- * @param partialAliasOf - Alias information for sub-properties
  * @returns Array of sub-tokens
  */
-function convertShadowLayer(
-  shadow: DTCGShadowValue,
-  prefix: string,
-  context: ConverterContext,
-  partialAliasOf: Record<string, string | undefined> | undefined,
-): SubToken[] {
+function convertShadowLayer(shadow: DTCGShadowValue, prefix: string, context: ConverterContext): SubToken[] {
   const subTokens: SubToken[] = [];
 
   // Convert color
   if (shadow.color !== undefined) {
     const aliasKey = `${prefix}color`;
-    const aliasOf = getSubTokenAlias(partialAliasOf?.[aliasKey], aliasKey, context.allTokens, 'shadow');
-
     const result = convertColor(shadow.color, {
       ...context,
       tokenId: `${context.tokenId}.${aliasKey}`,
     });
     if (!result.skip) {
-      subTokens.push({
-        idSuffix: aliasKey,
-        $type: 'color',
-        value: result.value,
-        aliasOf,
-      });
+      subTokens.push({ idSuffix: aliasKey, $type: 'color', value: result.value });
     }
   }
 
   // Convert offsetX
   if (shadow.offsetX !== undefined) {
     const aliasKey = `${prefix}offsetX`;
-    const aliasOf = getSubTokenAlias(partialAliasOf?.[aliasKey], aliasKey, context.allTokens, 'shadow');
-
     const result = convertDimension(shadow.offsetX, {
       ...context,
       tokenId: `${context.tokenId}.${aliasKey}`,
     });
     if (!result.skip) {
-      subTokens.push({
-        idSuffix: aliasKey,
-        $type: 'dimension',
-        value: result.value,
-        aliasOf,
-      });
+      subTokens.push({ idSuffix: aliasKey, $type: 'dimension', value: result.value });
     }
   }
 
   // Convert offsetY
   if (shadow.offsetY !== undefined) {
     const aliasKey = `${prefix}offsetY`;
-    const aliasOf = getSubTokenAlias(partialAliasOf?.[aliasKey], aliasKey, context.allTokens, 'shadow');
-
     const result = convertDimension(shadow.offsetY, {
       ...context,
       tokenId: `${context.tokenId}.${aliasKey}`,
     });
     if (!result.skip) {
-      subTokens.push({
-        idSuffix: aliasKey,
-        $type: 'dimension',
-        value: result.value,
-        aliasOf,
-      });
+      subTokens.push({ idSuffix: aliasKey, $type: 'dimension', value: result.value });
     }
   }
 
   // Convert blur
   if (shadow.blur !== undefined) {
     const aliasKey = `${prefix}blur`;
-    const aliasOf = getSubTokenAlias(partialAliasOf?.[aliasKey], aliasKey, context.allTokens, 'shadow');
-
     const result = convertDimension(shadow.blur, {
       ...context,
       tokenId: `${context.tokenId}.${aliasKey}`,
     });
     if (!result.skip) {
-      subTokens.push({
-        idSuffix: aliasKey,
-        $type: 'dimension',
-        value: result.value,
-        aliasOf,
-      });
+      subTokens.push({ idSuffix: aliasKey, $type: 'dimension', value: result.value });
     }
   }
 
   // Convert spread
   if (shadow.spread !== undefined) {
     const aliasKey = `${prefix}spread`;
-    const aliasOf = getSubTokenAlias(partialAliasOf?.[aliasKey], aliasKey, context.allTokens, 'shadow');
-
     const result = convertDimension(shadow.spread, {
       ...context,
       tokenId: `${context.tokenId}.${aliasKey}`,
     });
     if (!result.skip) {
-      subTokens.push({
-        idSuffix: aliasKey,
-        $type: 'dimension',
-        value: result.value,
-        aliasOf,
-      });
+      subTokens.push({ idSuffix: aliasKey, $type: 'dimension', value: result.value });
     }
   }
 
@@ -135,6 +94,10 @@ function convertShadowLayer(
  *
  * Single shadows produce: color, offsetX, offsetY, blur, spread
  * Multiple shadow layers produce indexed sub-tokens: 0.color, 0.offsetX, ..., 1.color, etc.
+ *
+ * @param value - The DTCG shadow value (single object or array of shadow layers)
+ * @param context - Converter context with logger and plugin options
+ * @returns Split result with sub-tokens for each shadow property, or skip indicator for invalid values
  */
 export function convertShadow(value: unknown, context: ConverterContext): ConverterResult {
   if (!isDTCGShadowValue(value)) {
@@ -146,25 +109,24 @@ export function convertShadow(value: unknown, context: ConverterContext): Conver
     return { value: undefined, skip: true };
   }
 
-  const partialAliasOf = context.partialAliasOf;
   const subTokens: SubToken[] = [];
 
   if (Array.isArray(value)) {
     if (value.length === 1) {
       // Single-element array: treat as a single shadow (no index prefix)
-      const layerTokens = convertShadowLayer(value[0] as DTCGShadowValue, '', context, partialAliasOf);
+      const layerTokens = convertShadowLayer(value[0] as DTCGShadowValue, '', context);
       subTokens.push(...layerTokens);
     } else {
       // Multiple shadow layers: use indexed prefixes
       for (let i = 0; i < value.length; i++) {
         const layer = value[i] as DTCGShadowValue;
-        const layerTokens = convertShadowLayer(layer, `${i}.`, context, partialAliasOf);
+        const layerTokens = convertShadowLayer(layer, `${i}.`, context);
         subTokens.push(...layerTokens);
       }
     }
   } else {
     // Single shadow object
-    const layerTokens = convertShadowLayer(value, '', context, partialAliasOf);
+    const layerTokens = convertShadowLayer(value, '', context);
     subTokens.push(...layerTokens);
   }
 

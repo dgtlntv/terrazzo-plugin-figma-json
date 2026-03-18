@@ -16,8 +16,8 @@ export interface FigmaExtensionKeys {
    * Key: "com.figma.aliasData"
    */
   'com.figma.aliasData'?: {
-    collection: string;
-    mode: string;
+    targetVariableSetName: string;
+    targetVariableName: string;
   };
 }
 
@@ -58,6 +58,15 @@ export interface TokenWithPartialAlias {
  */
 export interface FigmaJsonPluginOptions {
   /**
+   * Control when this plugin runs relative to other plugins.
+   * - "pre": run before all other plugins
+   * - "post": run after all other plugins
+   * - undefined: run in array order (default)
+   *
+   * Use "post" if other plugins generate transforms this plugin should read.
+   */
+  enforce?: 'pre' | 'post';
+  /**
    * Output filename for the Figma-compatible JSON.
    * @default "tokens.figma.json"
    */
@@ -94,12 +103,6 @@ export interface FigmaJsonPluginOptions {
   remBasePx?: number;
 
   /**
-   * Whether to log warnings for unsupported token types.
-   * @default true
-   */
-  warnOnUnsupported?: boolean;
-
-  /**
    * Preserve token references (aliases) in the output.
    * When true:
    * - Same-file references use curly brace syntax in $value (e.g., "{dimension.100}")
@@ -132,7 +135,6 @@ export interface ConverterContext {
   extensions?: TokenExtensions;
   allTokens?: Record<string, TokenNormalized>;
   originalValue?: unknown;
-  partialAliasOf?: Record<string, string | undefined>;
 }
 
 /**
@@ -142,7 +144,6 @@ export interface SubToken {
   idSuffix: string;
   $type: string;
   value: unknown;
-  aliasOf?: string;
 }
 
 /**

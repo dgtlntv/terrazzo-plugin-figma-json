@@ -1,4 +1,3 @@
-import type { TokenNormalized } from '@terrazzo/parser';
 import { describe, expect, it, vi } from 'vitest';
 import { convertBorder } from '../src/converters/border.js';
 import { convertColor } from '../src/converters/color.js';
@@ -715,97 +714,8 @@ describe('convertTypography', () => {
     expect(result.subTokens?.map((t) => t.idSuffix)).toEqual(['fontFamily', 'fontWeight']);
   });
 
-  it('preserves aliasOf for primitive token references', () => {
-    const ctx = createContext({
-      partialAliasOf: {
-        fontFamily: 'typography.fontFamily.sansSerif',
-        fontSize: 'dimension.size.100',
-      },
-      allTokens: {
-        'typography.fontFamily.sansSerif': { $type: 'fontFamily' } as TokenNormalized,
-        'dimension.size.100': { $type: 'dimension' } as TokenNormalized,
-      },
-    });
-    const result = convertTypography(
-      {
-        fontFamily: 'Inter',
-        fontSize: { value: 16, unit: 'px' },
-      },
-      ctx,
-    );
-
-    expect(result.split).toBe(true);
-    const fontFamilyToken = result.subTokens?.find((t) => t.idSuffix === 'fontFamily');
-    const fontSizeToken = result.subTokens?.find((t) => t.idSuffix === 'fontSize');
-    // Primitive references are kept as-is
-    expect(fontFamilyToken?.aliasOf).toBe('typography.fontFamily.sansSerif');
-    expect(fontSizeToken?.aliasOf).toBe('dimension.size.100');
-  });
-
-  it('appends property name when referencing typography token (JSON pointer to typography)', () => {
-    const ctx = createContext({
-      partialAliasOf: {
-        fontFamily: 'typography.base',
-        fontSize: 'typography.base',
-        lineHeight: 'typography.base',
-      },
-      allTokens: {
-        'typography.base': { $type: 'typography' } as TokenNormalized,
-      },
-    });
-    const result = convertTypography(
-      {
-        fontFamily: 'Inter',
-        fontSize: { value: 16, unit: 'px' },
-        lineHeight: 1.5,
-      },
-      ctx,
-    );
-
-    expect(result.split).toBe(true);
-    const fontFamilyToken = result.subTokens?.find((t) => t.idSuffix === 'fontFamily');
-    const fontSizeToken = result.subTokens?.find((t) => t.idSuffix === 'fontSize');
-    const lineHeightToken = result.subTokens?.find((t) => t.idSuffix === 'lineHeight');
-    // Typography references get the property name appended
-    expect(fontFamilyToken?.aliasOf).toBe('typography.base.fontFamily');
-    expect(fontSizeToken?.aliasOf).toBe('typography.base.fontSize');
-    // lineHeight loses its alias because we compute an absolute value (multiplier × fontSize)
-    expect(lineHeightToken?.aliasOf).toBeUndefined();
-    expect(lineHeightToken?.value).toEqual({ value: 24, unit: 'px' }); // 1.5 × 16px
-  });
-
-  it('handles mixed references (some to typography, some to primitives)', () => {
-    const ctx = createContext({
-      partialAliasOf: {
-        fontFamily: 'typography.base', // typography token
-        fontSize: 'dimension.size.100', // primitive token
-        fontWeight: 'typography.weight.bold', // primitive (fontWeight type)
-      },
-      allTokens: {
-        'typography.base': { $type: 'typography' } as TokenNormalized,
-        'dimension.size.100': { $type: 'dimension' } as TokenNormalized,
-        'typography.weight.bold': { $type: 'fontWeight' } as TokenNormalized,
-      },
-    });
-    const result = convertTypography(
-      {
-        fontFamily: 'Inter',
-        fontSize: { value: 16, unit: 'px' },
-        fontWeight: 700,
-      },
-      ctx,
-    );
-
-    expect(result.split).toBe(true);
-    const fontFamilyToken = result.subTokens?.find((t) => t.idSuffix === 'fontFamily');
-    const fontSizeToken = result.subTokens?.find((t) => t.idSuffix === 'fontSize');
-    const fontWeightToken = result.subTokens?.find((t) => t.idSuffix === 'fontWeight');
-    // Typography reference gets property appended
-    expect(fontFamilyToken?.aliasOf).toBe('typography.base.fontFamily');
-    // Primitive references stay as-is
-    expect(fontSizeToken?.aliasOf).toBe('dimension.size.100');
-    expect(fontWeightToken?.aliasOf).toBe('typography.weight.bold');
-  });
+  // Note: aliasOf resolution for sub-tokens is now handled in the build step,
+  // not in converters. See integration tests for alias preservation behavior.
 });
 
 describe('convertShadow', () => {
@@ -963,29 +873,8 @@ describe('convertShadow', () => {
     expect(result.subTokens?.find((t) => t.idSuffix === 'blur')?.value).toEqual({ value: 8, unit: 'px' });
   });
 
-  it('preserves aliasOf for primitive token references', () => {
-    const ctx = createContext({
-      partialAliasOf: {
-        color: 'color.shadow-color',
-        offsetY: 'dimension.shadow-offset',
-      },
-      allTokens: {
-        'color.shadow-color': { $type: 'color' } as TokenNormalized,
-        'dimension.shadow-offset': { $type: 'dimension' } as TokenNormalized,
-      },
-    });
-    const result = convertShadow(
-      {
-        color: { colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.2 },
-        offsetY: { value: 4, unit: 'px' },
-      },
-      ctx,
-    );
-
-    expect(result.split).toBe(true);
-    expect(result.subTokens?.find((t) => t.idSuffix === 'color')?.aliasOf).toBe('color.shadow-color');
-    expect(result.subTokens?.find((t) => t.idSuffix === 'offsetY')?.aliasOf).toBe('dimension.shadow-offset');
-  });
+  // Note: aliasOf resolution for sub-tokens is now handled in the build step,
+  // not in converters. See integration tests for alias preservation behavior.
 });
 
 describe('convertBorder', () => {
@@ -1069,29 +958,8 @@ describe('convertBorder', () => {
     expect(ctx.logger.warn).toHaveBeenCalled();
   });
 
-  it('preserves aliasOf for primitive token references', () => {
-    const ctx = createContext({
-      partialAliasOf: {
-        color: 'color.border-color',
-        width: 'dimension.border-width',
-      },
-      allTokens: {
-        'color.border-color': { $type: 'color' } as TokenNormalized,
-        'dimension.border-width': { $type: 'dimension' } as TokenNormalized,
-      },
-    });
-    const result = convertBorder(
-      {
-        color: { colorSpace: 'srgb', components: [0, 0, 0] },
-        width: { value: 1, unit: 'px' },
-      },
-      ctx,
-    );
-
-    expect(result.split).toBe(true);
-    expect(result.subTokens?.find((t) => t.idSuffix === 'color')?.aliasOf).toBe('color.border-color');
-    expect(result.subTokens?.find((t) => t.idSuffix === 'width')?.aliasOf).toBe('dimension.border-width');
-  });
+  // Note: aliasOf resolution for sub-tokens is now handled in the build step,
+  // not in converters. See integration tests for alias preservation behavior.
 
   it('skips invalid sub-properties but includes valid ones', () => {
     const ctx = createContext();
@@ -1207,27 +1075,6 @@ describe('convertGradient', () => {
     expect(result.subTokens?.[1]?.value).toHaveProperty('colorSpace', 'srgb');
   });
 
-  it('preserves aliasOf for primitive token references', () => {
-    const ctx = createContext({
-      partialAliasOf: {
-        '0.color': 'color.start',
-        '1.color': 'color.end',
-      },
-      allTokens: {
-        'color.start': { $type: 'color' } as TokenNormalized,
-        'color.end': { $type: 'color' } as TokenNormalized,
-      },
-    });
-    const result = convertGradient(
-      [
-        { color: { colorSpace: 'srgb', components: [1, 0, 0] }, position: 0 },
-        { color: { colorSpace: 'srgb', components: [0, 0, 1] }, position: 1 },
-      ],
-      ctx,
-    );
-
-    expect(result.split).toBe(true);
-    expect(result.subTokens?.find((t) => t.idSuffix === '0.color')?.aliasOf).toBe('color.start');
-    expect(result.subTokens?.find((t) => t.idSuffix === '1.color')?.aliasOf).toBe('color.end');
-  });
+  // Note: aliasOf resolution for sub-tokens is now handled in the build step,
+  // not in converters. See integration tests for alias preservation behavior.
 });

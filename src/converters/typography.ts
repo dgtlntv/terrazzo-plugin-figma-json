@@ -1,6 +1,6 @@
 import { PLUGIN_NAME } from '../constants.js';
 import type { ConverterContext, ConverterResult, SubToken } from '../types.js';
-import { getSubTokenAlias, isDTCGTypographyValue } from '../utils.js';
+import { isDTCGTypographyValue } from '../utils.js';
 import { convertDimension } from './dimension.js';
 import { convertFontFamily } from './font-family.js';
 import { convertFontWeight } from './font-weight.js';
@@ -21,6 +21,10 @@ import { convertLineHeight } from './line-height.js';
  *   letterSpacing: { value: 0, unit: "px" }
  * }, context);
  * // => { value: undefined, split: true, subTokens: [...] }
+ *
+ * @param value - The DTCG typography value (object with fontFamily, fontSize, fontWeight, lineHeight, letterSpacing)
+ * @param context - Converter context with logger and plugin options
+ * @returns Split result with sub-tokens for each typography property, or skip indicator for invalid values
  */
 export function convertTypography(value: unknown, context: ConverterContext): ConverterResult {
   if (!isDTCGTypographyValue(value)) {
@@ -33,22 +37,10 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
   }
   const typography = value;
 
-  // Get partial alias information from the token (populated by terrazzo parser)
-  // Note: partialAliasOf contains the FINAL alias targets after full resolution.
-  // Intermediate references (like JSON pointer $refs to other tokens in the same file)
-  // are resolved by the parser before we receive them. This is because:
-  // 1. processTokens() resolves $ref and stores in refMap
-  // 2. replaceNode() replaces $ref with the resolved curly-brace alias
-  // 3. resolveAliases() processes the curly-brace alias and OVERWRITES the refMap entry
-  // So we only see the final target, not intermediate JSON pointer targets.
-  const partialAliasOf = context.partialAliasOf;
-
   const subTokens: SubToken[] = [];
 
   // Convert fontFamily
   if (typography.fontFamily !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.fontFamily, 'fontFamily', context.allTokens, 'typography');
-
     const result = convertFontFamily(typography.fontFamily, {
       ...context,
       tokenId: `${context.tokenId}.fontFamily`,
@@ -58,7 +50,6 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
         idSuffix: 'fontFamily',
         $type: 'fontFamily',
         value: result.value,
-        aliasOf,
       });
     }
   }
@@ -67,8 +58,6 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
   // We also store the resolved fontSize for lineHeight calculation
   let resolvedFontSize: { value: number; unit: string } | undefined;
   if (typography.fontSize !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.fontSize, 'fontSize', context.allTokens, 'typography');
-
     const result = convertDimension(typography.fontSize, {
       ...context,
       tokenId: `${context.tokenId}.fontSize`,
@@ -79,15 +68,12 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
         idSuffix: 'fontSize',
         $type: 'dimension',
         value: result.value,
-        aliasOf,
       });
     }
   }
 
   // Convert fontWeight
   if (typography.fontWeight !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.fontWeight, 'fontWeight', context.allTokens, 'typography');
-
     const result = convertFontWeight(typography.fontWeight, {
       ...context,
       tokenId: `${context.tokenId}.fontWeight`,
@@ -97,7 +83,6 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
         idSuffix: 'fontWeight',
         $type: result.outputType ?? 'fontWeight',
         value: result.value,
-        aliasOf,
       });
     }
   }
@@ -117,15 +102,12 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
         idSuffix: 'lineHeight',
         $type: 'dimension',
         value: result.value,
-        // No aliasOf: the computed dimension cannot reference the original number token
       });
     }
   }
 
   // Convert letterSpacing (dimension)
   if (typography.letterSpacing !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.letterSpacing, 'letterSpacing', context.allTokens, 'typography');
-
     const result = convertDimension(typography.letterSpacing, {
       ...context,
       tokenId: `${context.tokenId}.letterSpacing`,
@@ -135,7 +117,6 @@ export function convertTypography(value: unknown, context: ConverterContext): Co
         idSuffix: 'letterSpacing',
         $type: 'dimension',
         value: result.value,
-        aliasOf,
       });
     }
   }

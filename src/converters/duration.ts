@@ -15,6 +15,10 @@ import { isDTCGDurationValue } from '../utils.js';
  * // ms values are converted to s
  * convertDuration({ value: 500, unit: "ms" }, context);
  * // => { value: { value: 0.5, unit: "s" } }
+ *
+ * @param value - The DTCG duration value to convert (should match DTCGDurationValue structure)
+ * @param context - Converter context with logger and plugin options
+ * @returns Converted duration in seconds, or skip indicator for unsupported units
  */
 export function convertDuration(value: unknown, context: ConverterContext): ConverterResult {
   if (!isDTCGDurationValue(value)) {

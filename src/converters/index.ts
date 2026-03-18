@@ -35,6 +35,9 @@ const converters: Record<SupportedType, Converter> = {
 
 /**
  * Check if a token type is supported by Figma.
+ *
+ * @param type - The DTCG token type string
+ * @returns True if the type is one of the Figma-supported token types
  */
 export function isSupportedType(type: string): type is SupportedType {
   return SUPPORTED_TYPES.includes(type as SupportedType);
@@ -42,6 +45,9 @@ export function isSupportedType(type: string): type is SupportedType {
 
 /**
  * Check if a value is an alias reference (curly brace syntax).
+ *
+ * @param value - The value to check
+ * @returns True if value is a string wrapped in curly braces (e.g., "{color.primary}")
  */
 export function isAlias(value: unknown): value is string {
   return typeof value === 'string' && value.startsWith('{') && value.endsWith('}');
@@ -58,6 +64,10 @@ function extractAliasTarget(alias: string): string {
 
 /**
  * Validate an alias reference and return any warnings.
+ *
+ * @param alias - The alias string to validate (e.g., "{color.primary}")
+ * @param context - Converter context with allTokens map for validation
+ * @returns Object with valid flag and optional warning message
  */
 function validateAlias(alias: string, context: ConverterContext): { valid: boolean; warning?: string } {
   const targetId = extractAliasTarget(alias);
@@ -138,24 +148,9 @@ export function convertToken(token: TokenNormalized, value: unknown, context: Co
     return { value };
   }
 
-  // Check if type is supported
+  // Silently skip unsupported types — the figma/unsupported-type lint rule
+  // handles reporting these to the user with configurable severity.
   if (!isSupportedType($type)) {
-    const isKnownUnsupported = UNSUPPORTED_TYPES.includes($type as (typeof UNSUPPORTED_TYPES)[number]);
-
-    if (context.options.warnOnUnsupported !== false) {
-      const suggestion = isKnownUnsupported
-        ? ` Consider excluding this token with the 'exclude' option, or use a supported type (color, dimension, duration, fontFamily, fontWeight, number).`
-        : ` If this is a custom type, consider using the 'transform' option to convert it to a supported format.`;
-
-      context.logger.warn({
-        group: 'plugin',
-        label: PLUGIN_NAME,
-        message: isKnownUnsupported
-          ? `Token "${context.tokenId}" has unsupported type "${$type}" and will be skipped.${suggestion}`
-          : `Token "${context.tokenId}" has unknown type "${$type}" and will be skipped.${suggestion}`,
-      });
-    }
-
     return { value: undefined, skip: true };
   }
 

@@ -58,7 +58,7 @@ describe('edge cases', () => {
       },
     };
 
-    const contents = await runPluginWithSource(JSON.stringify(tokens), { warnOnUnsupported: false });
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
     const parsed = JSON.parse(contents ?? '{}');
 
     // All unsupported types should be filtered out
@@ -311,7 +311,7 @@ describe('edge cases', () => {
       },
     };
 
-    const contents = await runPluginWithSource(JSON.stringify(tokens), { warnOnUnsupported: false });
+    const contents = await runPluginWithSource(JSON.stringify(tokens));
     const parsed = JSON.parse(contents ?? '{}');
 
     // Supported types should be present
@@ -356,9 +356,7 @@ describe('edge cases', () => {
     expect(parsed.color.solid.$value.alpha).toBe(1);
   });
 
-  it('resolves alias references in fallback mode (no resolver)', async () => {
-    // Without a resolver file, references are always resolved since there's no
-    // concept of "same-file" vs "cross-file" references
+  it('preserves alias references with default resolver', async () => {
     const tokens = {
       color: {
         $type: 'color',
@@ -374,12 +372,11 @@ describe('edge cases', () => {
     const contents = await runPluginWithSource(JSON.stringify(tokens));
     const parsed = JSON.parse(contents ?? '{}');
 
-    // In fallback mode, references are resolved to their values
-    expect(parsed.color.secondary.$value.colorSpace).toBe('srgb');
-    expect(parsed.color.secondary.$value.components).toEqual([0.2, 0.4, 0.8]);
+    // Alias references are preserved as same-file references
+    expect(parsed.color.secondary.$value).toBe('{color.primary}');
   });
 
-  it('resolves dimension references in fallback mode', async () => {
+  it('preserves dimension references with default resolver', async () => {
     const tokens = {
       dimension: {
         $type: 'dimension',
@@ -395,8 +392,8 @@ describe('edge cases', () => {
     const contents = await runPluginWithSource(JSON.stringify(tokens));
     const parsed = JSON.parse(contents ?? '{}');
 
-    // In fallback mode, references are resolved
-    expect(parsed.dimension.large.$value).toEqual({ value: 16, unit: 'px' });
+    // Alias references are preserved as same-file references
+    expect(parsed.dimension.large.$value).toBe('{dimension.base}');
   });
 
   // Note: Typography token splitting is tested in test/index.test.ts with the typography fixture

@@ -15,6 +15,10 @@ import { isDTCGDimensionValue } from '../utils.js';
  * // rem values are converted to px (default base: 16px)
  * convertDimension({ value: 1.5, unit: "rem" }, context);
  * // => { value: { value: 24, unit: "px" } }
+ *
+ * @param value - The DTCG dimension value to convert (should match DTCGDimensionValue structure)
+ * @param context - Converter context with logger and plugin options (includes remBasePx)
+ * @returns Converted dimension in px units, or skip indicator for unsupported units
  */
 export function convertDimension(value: unknown, context: ConverterContext): ConverterResult {
   if (!isDTCGDimensionValue(value)) {

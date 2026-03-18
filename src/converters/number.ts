@@ -14,6 +14,10 @@ import type { ConverterContext, ConverterResult } from '../types.js';
  * // Token with $extensions: { "com.figma": { "type": "boolean" } }
  * convertNumber(0, contextWithBooleanExt) // => { value: false }
  * convertNumber(1, contextWithBooleanExt) // => { value: true }
+ *
+ * @param value - The DTCG number value to convert
+ * @param context - Converter context with logger, plugin options, and token extensions
+ * @returns Number value (or boolean if com.figma.type is "boolean"), or skip indicator for invalid values
  */
 export function convertNumber(value: unknown, context: ConverterContext): ConverterResult {
   if (typeof value !== 'number') {

@@ -72,6 +72,10 @@ const DTCG_TO_COLORJS_SPACE: Record<string, string> = {
  *   components: [0.7, 0.15, 150]
  * }, context);
  * // => { value: { colorSpace: "srgb", components: [...], alpha: 1 } }
+ *
+ * @param value - The DTCG color value to convert (should match DTCGColorValue structure)
+ * @param context - Converter context with logger and plugin options
+ * @returns Converted color value in sRGB or HSL, or skip indicator for invalid values
  */
 export function convertColor(value: unknown, context: ConverterContext): ConverterResult {
   if (!isDTCGColorValue(value)) {

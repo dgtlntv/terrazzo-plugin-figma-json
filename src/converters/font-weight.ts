@@ -38,6 +38,10 @@ const FONT_WEIGHT_ALIASES: Record<string, number> = {
  * // String aliases pass through if valid
  * convertFontWeight("bold", context);
  * // => { value: "bold" }
+ *
+ * @param value - The DTCG fontWeight value (number 1-1000 or string alias like "bold")
+ * @param context - Converter context with logger and plugin options
+ * @returns Font weight value with outputType set to 'number' or 'string', or skip indicator for invalid values
  */
 export function convertFontWeight(value: unknown, context: ConverterContext): ConverterResult {
   // Number passthrough - validate range, output as 'number' type

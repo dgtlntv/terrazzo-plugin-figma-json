@@ -1,6 +1,6 @@
 import { PLUGIN_NAME } from '../constants.js';
 import type { ConverterContext, ConverterResult, SubToken } from '../types.js';
-import { getSubTokenAlias, isDTCGBorderValue } from '../utils.js';
+import { isDTCGBorderValue } from '../utils.js';
 import { convertColor } from './color.js';
 import { convertDimension } from './dimension.js';
 
@@ -8,6 +8,10 @@ import { convertDimension } from './dimension.js';
  * Convert a DTCG border value to Figma-compatible format.
  * Border tokens are partially split into individual sub-tokens.
  * Only color and width are supported; style is dropped.
+ *
+ * @param value - The DTCG border value (object with color, width, and optional style)
+ * @param context - Converter context with logger and plugin options
+ * @returns Split result with color and width sub-tokens, or skip indicator for invalid values
  */
 export function convertBorder(value: unknown, context: ConverterContext): ConverterResult {
   if (!isDTCGBorderValue(value)) {
@@ -20,42 +24,27 @@ export function convertBorder(value: unknown, context: ConverterContext): Conver
   }
 
   const border = value;
-  const partialAliasOf = context.partialAliasOf;
   const subTokens: SubToken[] = [];
 
   // Convert color
   if (border.color !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.color, 'color', context.allTokens, 'border');
-
     const result = convertColor(border.color, {
       ...context,
       tokenId: `${context.tokenId}.color`,
     });
     if (!result.skip) {
-      subTokens.push({
-        idSuffix: 'color',
-        $type: 'color',
-        value: result.value,
-        aliasOf,
-      });
+      subTokens.push({ idSuffix: 'color', $type: 'color', value: result.value });
     }
   }
 
   // Convert width
   if (border.width !== undefined) {
-    const aliasOf = getSubTokenAlias(partialAliasOf?.width, 'width', context.allTokens, 'border');
-
     const result = convertDimension(border.width, {
       ...context,
       tokenId: `${context.tokenId}.width`,
     });
     if (!result.skip) {
-      subTokens.push({
-        idSuffix: 'width',
-        $type: 'dimension',
-        value: result.value,
-        aliasOf,
-      });
+      subTokens.push({ idSuffix: 'width', $type: 'dimension', value: result.value });
     }
   }
 

@@ -3,19 +3,6 @@ export const PLUGIN_NAME = 'terrazzo-plugin-figma-json';
 export const FORMAT_ID = 'figma-json';
 
 /**
- * Internal metadata property keys used for token processing.
- * These are added during transform and removed during build.
- */
-export const INTERNAL_KEYS = {
-  /** Target token ID for alias references */
-  ALIAS_OF: '_aliasOf',
-  /** Parent token ID for split sub-tokens (e.g., typography) */
-  SPLIT_FROM: '_splitFrom',
-  /** Token ID for split sub-tokens */
-  TOKEN_ID: '_tokenId',
-} as const;
-
-/**
  * Token types supported by Figma.
  */
 export const SUPPORTED_TYPES = [

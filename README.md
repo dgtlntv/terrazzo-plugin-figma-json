@@ -4,18 +4,16 @@ A [Terrazzo](https://terrazzo.app) plugin that converts W3C DTCG design tokens i
 
 ## Requirements
 
-This plugin requires Terrazzo 2.0.0-beta.0 or later:
+This plugin requires Terrazzo 2.0:
 
 ```bash
-npm install @terrazzo/cli@2.0.0-beta.0 @terrazzo/parser@2.0.0-beta.0
+npm install @terrazzo/cli
 ```
 
 ## Installation
 
 ```bash
 npm install terrazzo-plugin-figma-json
-# or
-pnpm add terrazzo-plugin-figma-json
 ```
 
 ## Basic Usage
@@ -61,11 +59,11 @@ With a resolver file, the plugin splits output by resolver sets and modifier con
 
 ```
 dist/
-├── primitive.figma.json       # From "primitive" set
-├── semantic.figma.json        # From "semantic" set
-├── colorScheme-light.figma.json
-├── colorScheme-dark.figma.json
-└── breakpoint-small.figma.json
+├── primitive.tokens.figma.json       # From "primitive" set
+├── semantic.tokens.figma.json        # From "semantic" set
+├── colorScheme-light.tokens.figma.json
+├── colorScheme-dark.tokens.figma.json
+└── breakpoint-small.tokens.figma.json
 ```
 
 Without a resolver, all tokens are output to a single file (`tokens.figma.json` by default).

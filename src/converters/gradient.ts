@@ -1,12 +1,16 @@
 import { PLUGIN_NAME } from '../constants.js';
 import type { ConverterContext, ConverterResult, SubToken } from '../types.js';
-import { getSubTokenAlias, isDTCGGradientValue } from '../utils.js';
+import { isDTCGGradientValue } from '../utils.js';
 import { convertColor } from './color.js';
 
 /**
  * Convert a DTCG gradient value to Figma-compatible format.
  * Gradient tokens are partially split: only stop colors are extracted.
  * Stop positions are dropped since they can't be represented as Figma variables.
+ *
+ * @param value - The DTCG gradient value (array of gradient stops with color and position)
+ * @param context - Converter context with logger and plugin options
+ * @returns Split result with color sub-tokens for each stop, or skip indicator for invalid values
  */
 export function convertGradient(value: unknown, context: ConverterContext): ConverterResult {
   if (!isDTCGGradientValue(value)) {
@@ -18,7 +22,6 @@ export function convertGradient(value: unknown, context: ConverterContext): Conv
     return { value: undefined, skip: true };
   }
 
-  const partialAliasOf = context.partialAliasOf;
   const subTokens: SubToken[] = [];
   let hasPosition = false;
 
@@ -27,19 +30,12 @@ export function convertGradient(value: unknown, context: ConverterContext): Conv
 
     if (stop.color !== undefined) {
       const aliasKey = `${i}.color`;
-      const aliasOf = getSubTokenAlias(partialAliasOf?.[aliasKey], aliasKey, context.allTokens, 'gradient');
-
       const result = convertColor(stop.color, {
         ...context,
         tokenId: `${context.tokenId}.${aliasKey}`,
       });
       if (!result.skip) {
-        subTokens.push({
-          idSuffix: aliasKey,
-          $type: 'color',
-          value: result.value,
-          aliasOf,
-        });
+        subTokens.push({ idSuffix: aliasKey, $type: 'color', value: result.value });
       }
     }
 

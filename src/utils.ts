@@ -1,6 +1,4 @@
-import type { Resolver } from '@terrazzo/parser';
 import wcmatch from 'wildcard-match';
-import { INTERNAL_KEYS, type SupportedType } from './constants.js';
 import type {
   DTCGBorderValue,
   DTCGColorValue,
@@ -9,9 +7,24 @@ import type {
   DTCGGradientStop,
   DTCGShadowValue,
   DTCGTypographyValue,
-  PartialAliasOf,
-  TokenWithPartialAlias,
+  TokenExtensions,
 } from './types.js';
+
+/**
+ * Compute the localID for a token in Figma's slash-notation format.
+ * This is used as the `localID` in `setTransform()` and represents
+ * how the token is referenced within the Figma JSON format.
+ *
+ * @param tokenId - Dot-notation token ID (e.g., "color.primary.base")
+ * @returns Slash-notation Figma variable name (e.g., "color/primary/base")
+ *
+ * @example
+ * toFigmaLocalID("color.primary.base") // "color/primary/base"
+ * toFigmaLocalID("spacing.200")        // "spacing/200"
+ */
+export function toFigmaLocalID(tokenId: string): string {
+  return tokenId.replace(/\./g, '/');
+}
 
 /**
  * Create an exclude matcher function from glob patterns.
@@ -24,95 +37,56 @@ export function createExcludeMatcher(patterns: string[] | undefined): (tokenId: 
 }
 
 /**
- * Type guard to check if the resolver has a usable configuration.
- * Terrazzo creates a default resolver even without a resolver file,
- * but it has empty contexts that cause errors when used.
+ * Filter extensions to only include Figma-specific ones (com.figma.*).
+ * Removes non-Figma extensions to keep output clean.
  *
- * @param resolver - The resolver from terrazzo parser
- * @returns true if resolver has user-defined sets or modifiers with contexts
+ * @param extensions - Token extensions object that may include various namespaces
+ * @returns Object with only com.figma.* keys, or undefined if none exist
+ *
+ * @example
+ * filterFigmaExtensions({ "com.figma.type": "boolean", "custom.ext": "value" })
+ * // { "com.figma.type": "boolean" }
  */
-export function hasValidResolverConfig(resolver: Resolver | undefined): resolver is Resolver {
-  if (!resolver?.source || !resolver.listPermutations) {
-    return false;
+export function filterFigmaExtensions(extensions: TokenExtensions | undefined): TokenExtensions | undefined {
+  if (!extensions) {
+    return undefined;
   }
 
-  const source = resolver.source;
-  const sets = source.sets ?? {};
-  const modifiers = source.modifiers ?? {};
+  const figmaExtensions: TokenExtensions = {};
+  let hasFigmaExtensions = false;
 
-  const hasUserSets = Object.keys(sets).some((name) => name !== 'allTokens');
-  const hasModifierContexts = Object.values(modifiers).some(
-    (mod) => mod.contexts && Object.keys(mod.contexts).length > 0,
-  );
-
-  return hasUserSets || hasModifierContexts;
-}
-
-/**
- * Build default input from resolver's modifiers.
- * Creates an input object with each modifier set to its default value.
- *
- * @param resolverSource - The resolver source configuration
- * @returns Input object for resolver.apply() with default modifier values
- */
-export function buildDefaultInput(resolverSource: NonNullable<Resolver['source']>): Record<string, string> {
-  const input: Record<string, string> = {};
-  if (resolverSource.modifiers) {
-    for (const [modifierName, modifier] of Object.entries(resolverSource.modifiers)) {
-      if (modifier.default) {
-        input[modifierName] = modifier.default;
-      }
+  for (const [key, value] of Object.entries(extensions)) {
+    if (key.startsWith('com.figma')) {
+      figmaExtensions[key] = value;
+      hasFigmaExtensions = true;
     }
   }
-  return input;
-}
 
-/**
- * Remove internal metadata properties from a parsed token value.
- * These properties are used for internal processing and should not appear in output.
- *
- * @param parsedValue - Token value object to clean (mutated in place)
- */
-export function removeInternalMetadata(parsedValue: Record<string, unknown>): void {
-  delete parsedValue[INTERNAL_KEYS.ALIAS_OF];
-  delete parsedValue[INTERNAL_KEYS.SPLIT_FROM];
-  delete parsedValue[INTERNAL_KEYS.TOKEN_ID];
+  return hasFigmaExtensions ? figmaExtensions : undefined;
 }
 
 /**
  * Safely parse a transform value that may be a JSON string or already an object.
- * Returns the parsed value or null if parsing fails.
  *
- * @param value - The transform value (string or object)
- * @returns Parsed value or null on error
+ * @param value - The transform value (JSON string or object)
+ * @returns The parsed object, or null if parsing fails
  */
-export function parseTransformValue(value: unknown): any {
+export function parseTransformValue(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'string') {
-    return value;
+    return value as Record<string, unknown>;
   }
   try {
-    return JSON.parse(value);
+    return JSON.parse(value) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
 /**
- * Extract partialAliasOf from a token if present.
- * This property is added by terrazzo parser for composite tokens but not in public types.
- */
-export function getPartialAliasOf(token: unknown): PartialAliasOf | undefined {
-  if (token && typeof token === 'object' && 'partialAliasOf' in token) {
-    const value = (token as TokenWithPartialAlias).partialAliasOf;
-    if (value && typeof value === 'object') {
-      return value;
-    }
-  }
-  return undefined;
-}
-
-/**
  * Type guard to validate DTCGColorValue structure.
+ *
+ * @param value - The value to check
+ * @returns True if value is a valid DTCGColorValue with colorSpace, components, and optional alpha
  */
 export function isDTCGColorValue(value: unknown): value is DTCGColorValue {
   if (!value || typeof value !== 'object') {
@@ -138,6 +112,9 @@ export function isDTCGColorValue(value: unknown): value is DTCGColorValue {
 
 /**
  * Type guard to validate DTCGDimensionValue structure.
+ *
+ * @param value - The value to check
+ * @returns True if value is a valid DTCGDimensionValue with numeric value and string unit
  */
 export function isDTCGDimensionValue(value: unknown): value is DTCGDimensionValue {
   if (!value || typeof value !== 'object') {
@@ -149,6 +126,9 @@ export function isDTCGDimensionValue(value: unknown): value is DTCGDimensionValu
 
 /**
  * Type guard to validate DTCGDurationValue structure.
+ *
+ * @param value - The value to check
+ * @returns True if value is a valid DTCGDurationValue with numeric value and string unit
  */
 export function isDTCGDurationValue(value: unknown): value is DTCGDurationValue {
   if (!value || typeof value !== 'object') {
@@ -161,6 +141,9 @@ export function isDTCGDurationValue(value: unknown): value is DTCGDurationValue 
 /**
  * Type guard to validate DTCGTypographyValue structure.
  * Only checks that it's an object - individual properties are validated during conversion.
+ *
+ * @param value - The value to check
+ * @returns True if value is a non-null, non-array object
  */
 export function isDTCGTypographyValue(value: unknown): value is DTCGTypographyValue {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -169,6 +152,9 @@ export function isDTCGTypographyValue(value: unknown): value is DTCGTypographyVa
 /**
  * Type guard to validate DTCGShadowValue structure.
  * Accepts a single shadow object or an array of shadow objects.
+ *
+ * @param value - The value to check
+ * @returns True if value is a non-null object or a non-empty array of non-null objects
  */
 export function isDTCGShadowValue(value: unknown): value is DTCGShadowValue | DTCGShadowValue[] {
   if (Array.isArray(value)) {
@@ -180,6 +166,9 @@ export function isDTCGShadowValue(value: unknown): value is DTCGShadowValue | DT
 /**
  * Type guard to validate DTCGBorderValue structure.
  * Only checks that it's an object - individual properties are validated during conversion.
+ *
+ * @param value - The value to check
+ * @returns True if value is a non-null, non-array object
  */
 export function isDTCGBorderValue(value: unknown): value is DTCGBorderValue {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -188,36 +177,10 @@ export function isDTCGBorderValue(value: unknown): value is DTCGBorderValue {
 /**
  * Type guard to validate DTCGGradientValue structure.
  * Checks that it's an array of gradient stops.
+ *
+ * @param value - The value to check
+ * @returns True if value is a non-empty array of non-null objects
  */
 export function isDTCGGradientValue(value: unknown): value is DTCGGradientStop[] {
   return Array.isArray(value) && value.length > 0 && value.every((item) => item !== null && typeof item === 'object');
-}
-
-/**
- * Get the correct alias reference for a composite sub-property.
- * When a composite property references another composite token of the same type,
- * the alias needs to point to the corresponding sub-token.
- *
- * @param aliasOf - The referenced token ID, or undefined if not an alias
- * @param propertyName - The sub-property name (e.g., fontFamily, color, offsetX)
- * @param allTokens - Map of all tokens for type lookup
- * @param parentType - The composite token type (e.g., 'typography', 'shadow', 'border', 'gradient')
- * @returns Adjusted alias target, or undefined if not an alias
- */
-export function getSubTokenAlias(
-  aliasOf: string | undefined,
-  propertyName: string,
-  allTokens: Record<string, { $type?: string }> | undefined,
-  parentType: SupportedType,
-): string | undefined {
-  if (!aliasOf) {
-    return undefined;
-  }
-
-  const referencedToken = allTokens?.[aliasOf];
-  if (referencedToken?.$type === parentType) {
-    return `${aliasOf}.${propertyName}`;
-  }
-
-  return aliasOf;
 }
