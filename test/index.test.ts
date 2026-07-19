@@ -85,6 +85,30 @@ describe('figma-json plugin', () => {
     );
   });
 
+  it('emits output for a resolver without modifiers', async () => {
+    const output = 'actual.json';
+    const cwd = new URL('./fixtures/resolver-no-modifiers/', import.meta.url);
+    const config = defineConfig(
+      {
+        plugins: [figmaJson({ filename: output })],
+      },
+      { cwd },
+    );
+
+    const resolverJSON = new URL('./tokens.resolver.json', cwd);
+    const { tokens, resolver, sources } = await parse(
+      [{ filename: resolverJSON, src: await fs.readFile(resolverJSON, 'utf8') }],
+      { config },
+    );
+
+    const result = await build(tokens, { resolver, sources, config });
+    const contents = result.outputFiles.find((f) => f.filename === `core.${output}`)?.contents;
+    expect(contents).toBeDefined();
+    await expect(contents).toMatchFileSnapshot(
+      fileURLToPath(new URL('./fixtures/resolver-no-modifiers/want.json', import.meta.url)),
+    );
+  });
+
   it('respects exclude option', async () => {
     const output = 'actual.json';
     const cwd = new URL('./fixtures/basic/', import.meta.url);

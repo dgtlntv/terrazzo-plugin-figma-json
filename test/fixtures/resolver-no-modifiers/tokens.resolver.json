@@ -1,0 +1,10 @@
+{
+  "$schema": "https://designtokens.org/schemas/2025.10/resolver.json",
+  "version": "2025.10",
+  "sets": {
+    "core": {
+      "sources": [{ "$ref": "./tokens.json" }]
+    }
+  },
+  "resolutionOrder": [{ "$ref": "#/sets/core" }]
+}

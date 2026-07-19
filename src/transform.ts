@@ -102,8 +102,7 @@ function transformToken(
  * permutations but only ~30 targeted inputs.
  */
 function collectBuildInputs(resolver: TransformHookOptions['resolver']): Record<string, string>[] {
-  const permutations = resolver.listPermutations();
-  const defaultInput: Record<string, string> = permutations[0] ?? {};
+  const defaultInput: Record<string, string> = resolver.listPermutations?.()[0] ?? {};
   const inputs: Record<string, string>[] = [defaultInput];
 
   const resolverSource = resolver.source;
@@ -146,15 +145,15 @@ function collectBuildInputs(resolver: TransformHookOptions['resolver']): Record<
 export default function transformFigmaJson({ transform, options }: TransformOptions): void {
   const { setTransform, context, resolver, tokens: rawTokens } = transform;
 
+  if (Object.keys(rawTokens).length === 0) {
+    return;
+  }
+
   const shouldExclude = createExcludeMatcher(options.exclude);
 
   const inputs = collectBuildInputs(resolver);
 
   for (const input of inputs) {
-    if (Object.keys(input).length === 0) {
-      continue;
-    }
-
     const contextTokens = resolver.apply(input);
 
     for (const token of Object.values(contextTokens)) {

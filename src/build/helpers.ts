@@ -86,8 +86,7 @@ export function isDefaultResolver(resolverSource: NonNullable<Resolver['source']
  * @returns The first permutation input object, or an empty object if none exist
  */
 export function getDefaultInput(resolver: Resolver): Record<string, string> {
-  const permutations = resolver.listPermutations();
-  return permutations[0] ?? {};
+  return resolver.listPermutations?.()[0] ?? {};
 }
 
 /**

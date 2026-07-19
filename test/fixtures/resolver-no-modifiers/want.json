@@ -1,0 +1,31 @@
+{
+  "color": {
+    "brand": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          1,
+          0,
+          0
+        ],
+        "alpha": 1
+      }
+    }
+  },
+  "fontWeight": {
+    "bold": {
+      "$type": "number",
+      "$value": 700
+    }
+  },
+  "spacing": {
+    "medium": {
+      "$type": "dimension",
+      "$value": {
+        "value": 16,
+        "unit": "px"
+      }
+    }
+  }
+}
