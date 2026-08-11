@@ -109,6 +109,50 @@ describe('figma-json plugin', () => {
     );
   });
 
+  it('uses context-specific aliases for resolver modifier outputs', async () => {
+    const output = 'actual.json';
+    const cwd = new URL('./fixtures/resolver-context-aliases/', import.meta.url);
+    const config = defineConfig(
+      {
+        plugins: [figmaJson({ filename: output, preserveReferences: true })],
+      },
+      { cwd },
+    );
+
+    const resolverJSON = new URL('./tokens.resolver.json', cwd);
+    const { tokens, resolver, sources } = await parse(
+      [{ filename: resolverJSON, src: await fs.readFile(resolverJSON, 'utf8') }],
+      { config },
+    );
+
+    const result = await build(tokens, { resolver, sources, config });
+    const light = JSON.parse(
+      String(result.outputFiles.find((file) => file.filename === `colorScheme-light.${output}`)?.contents ?? '{}'),
+    );
+    const dark = JSON.parse(
+      String(result.outputFiles.find((file) => file.filename === `colorScheme-dark.${output}`)?.contents ?? '{}'),
+    );
+
+    expect(light.semantic.color.dynamic.$value.components).toEqual([1, 1, 1]);
+    expect(light.semantic.color.dynamic.$extensions['com.figma.aliasData'].targetVariableName).toBe(
+      'primitive/color/white',
+    );
+    expect(dark.semantic.color.dynamic.$value.components).toEqual([0, 0, 0]);
+    expect(dark.semantic.color.dynamic.$extensions['com.figma.aliasData'].targetVariableName).toBe(
+      'primitive/color/black',
+    );
+
+    expect(light.semantic.color['same-file'].$value).toBe('{semantic.color.dynamic}');
+    expect(dark.semantic.color['same-file'].$value).toBe('{semantic.color.fixed}');
+
+    expect(light.semantic.border.focus.color.$extensions['com.figma.aliasData'].targetVariableName).toBe(
+      'primitive/color/white',
+    );
+    expect(dark.semantic.border.focus.color.$extensions['com.figma.aliasData'].targetVariableName).toBe(
+      'primitive/color/black',
+    );
+  });
+
   it('respects exclude option', async () => {
     const output = 'actual.json';
     const cwd = new URL('./fixtures/basic/', import.meta.url);

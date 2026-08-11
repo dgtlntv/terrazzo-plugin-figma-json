@@ -1,0 +1,27 @@
+{
+  "$schema": "https://designtokens.org/schemas/2025.10/format.json",
+  "semantic": {
+    "color": {
+      "$type": "color",
+      "dynamic": {
+        "$value": "{primitive.color.white}"
+      },
+      "fixed": {
+        "$value": "{primitive.color.black}"
+      },
+      "same-file": {
+        "$value": "{semantic.color.dynamic}"
+      }
+    },
+    "border": {
+      "$type": "border",
+      "focus": {
+        "$value": {
+          "color": "{primitive.color.white}",
+          "width": "{primitive.dimension.thin}",
+          "style": "solid"
+        }
+      }
+    }
+  }
+}

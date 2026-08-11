@@ -9,8 +9,9 @@ import type { ParsedTokenValue, SourceInfo } from './types.js';
  * Process a single transform and place it in the output object.
  * Handles both simple tokens (string value) and composite tokens (Record<string, string> value).
  *
- * Alias resolution is computed here from the token metadata (transform.token)
- * rather than from embedded internal metadata in the value.
+ * Alias resolution is computed from the token in the active resolver context.
+ * Terrazzo's transform result keeps the base token metadata even when its value
+ * is context-specific, so transform.token cannot be used for modifier aliases.
  *
  * Note: this intentionally mutates `output` via setNestedProperty for efficient
  * output tree construction.
@@ -23,7 +24,8 @@ import type { ParsedTokenValue, SourceInfo } from './types.js';
  * @param tokenSources - Map of token IDs to their source info for cross-file alias resolution
  * @param preserveReferences - Whether to preserve alias references in output
  * @param shouldExclude - Function to check if a token ID should be excluded
- * @param allTokens - Map of all tokens for composite alias resolution
+ * @param allTokens - Map of tokens in the active resolver context for composite alias resolution
+ * @param contextToken - Token metadata from the active modifier context, when applicable
  */
 export function processTransform(
   transform: {
@@ -38,6 +40,7 @@ export function processTransform(
   preserveReferences: boolean,
   shouldExclude: (id: string) => boolean,
   allTokens: Record<string, TokenNormalized> | undefined,
+  contextToken: TokenNormalized = transform.token,
 ): void {
   const token = transform.token;
   const tokenId = token.id;
@@ -55,8 +58,9 @@ export function processTransform(
       return;
     }
 
-    // Compute alias from the token itself
-    const aliasOf = computeAliasTarget(token);
+    // Compute the alias from the active resolver context. The transform token
+    // may carry metadata from the default context even when its value does not.
+    const aliasOf = computeAliasTarget(contextToken);
 
     let parsedValue = withTokenMetadata(rawParsed, token);
 
@@ -75,9 +79,9 @@ export function processTransform(
     // Composite token (Record<string, string>): expand sub-tokens into output
     const parentOutputPath = tokenOutputPaths.get(tokenId);
 
-    // Compute alias targets for all sub-properties from the token metadata
+    // Compute sub-property aliases from the active resolver context.
     const subTokenSuffixes = Object.keys(transform.value);
-    const subTokenAliases = computeSubTokenAliases(token, subTokenSuffixes, allTokens);
+    const subTokenAliases = computeSubTokenAliases(contextToken, subTokenSuffixes, allTokens);
 
     for (const [suffix, subValueStr] of Object.entries(transform.value)) {
       const rawSubParsed = parseTransformValue(subValueStr) as ParsedTokenValue | null;

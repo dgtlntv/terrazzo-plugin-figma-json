@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.4
+
+### Bug Fixes
+
+- Preserve context-specific alias targets in resolver modifier outputs. Previously, transformed values used the active context while alias metadata came from the default context, causing dark-mode Figma aliases to point at light-mode variables.
+
 ## 0.3.3
 
 ### Bug Fixes

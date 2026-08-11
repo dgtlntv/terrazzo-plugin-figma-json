@@ -162,6 +162,7 @@ export default function buildFigmaJson({
         preserveReferences,
         shouldExclude,
         contextTokens,
+        contextTokens?.[tokenId],
       );
     }
   }

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://designtokens.org/schemas/2025.10/resolver.json",
+  "name": "Context-specific alias fixture",
+  "version": "2025.10",
+  "sets": {
+    "primitive": {
+      "sources": [
+        { "$ref": "./primitives.tokens.json" }
+      ]
+    }
+  },
+  "modifiers": {
+    "colorScheme": {
+      "contexts": {
+        "light": [
+          { "$ref": "./light.tokens.json" }
+        ],
+        "dark": [
+          { "$ref": "./dark.tokens.json" }
+        ]
+      },
+      "default": "light"
+    }
+  },
+  "resolutionOrder": [
+    { "$ref": "#/sets/primitive" },
+    { "$ref": "#/modifiers/colorScheme" }
+  ]
+}
