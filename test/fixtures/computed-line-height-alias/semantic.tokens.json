@@ -1,0 +1,20 @@
+{
+  "$schema": "https://designtokens.org/schemas/2025.10/format.json",
+  "semantic": {
+    "typography": {
+      "$type": "typography",
+      "body": {
+        "$value": {
+          "fontFamily": "Inter",
+          "fontSize": "{primitive.dimension.font-size}",
+          "fontWeight": 400,
+          "letterSpacing": {
+            "value": 0,
+            "unit": "px"
+          },
+          "lineHeight": "{primitive.number.line-height}"
+        }
+      }
+    }
+  }
+}

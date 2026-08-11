@@ -1,0 +1,21 @@
+{
+  "$schema": "https://designtokens.org/schemas/2025.10/resolver.json",
+  "name": "Computed line-height alias fixture",
+  "version": "2025.10",
+  "sets": {
+    "primitive": {
+      "sources": [
+        { "$ref": "./primitives.tokens.json" }
+      ]
+    },
+    "semantic": {
+      "sources": [
+        { "$ref": "./semantic.tokens.json" }
+      ]
+    }
+  },
+  "resolutionOrder": [
+    { "$ref": "#/sets/primitive" },
+    { "$ref": "#/sets/semantic" }
+  ]
+}

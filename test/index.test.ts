@@ -109,6 +109,37 @@ describe('figma-json plugin', () => {
     );
   });
 
+  it('does not preserve aliases for computed typography line heights', async () => {
+    const output = 'actual.json';
+    const cwd = new URL('./fixtures/computed-line-height-alias/', import.meta.url);
+    const config = defineConfig(
+      {
+        plugins: [figmaJson({ filename: output, preserveReferences: true })],
+      },
+      { cwd },
+    );
+
+    const resolverJSON = new URL('./tokens.resolver.json', cwd);
+    const { tokens, resolver, sources } = await parse(
+      [{ filename: resolverJSON, src: await fs.readFile(resolverJSON, 'utf8') }],
+      { config },
+    );
+
+    const result = await build(tokens, { resolver, sources, config });
+    const semantic = JSON.parse(
+      String(result.outputFiles.find((file) => file.filename === `semantic.${output}`)?.contents ?? '{}'),
+    );
+    const typography = semantic.semantic.typography.body;
+
+    expect(typography.fontSize.$extensions['com.figma.aliasData'].targetVariableName).toBe(
+      'primitive/dimension/font-size',
+    );
+    expect(typography.lineHeight).toEqual({
+      $type: 'dimension',
+      $value: { value: 24, unit: 'px' },
+    });
+  });
+
   it('uses context-specific aliases for resolver modifier outputs', async () => {
     const output = 'actual.json';
     const cwd = new URL('./fixtures/resolver-context-aliases/', import.meta.url);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.5
+
+### Bug Fixes
+
+- Do not preserve aliases from computed typography line-height dimensions to their source number multipliers. The generated px value must remain concrete because aliasing it to the unitless multiplier produces an incorrect value in Figma.
+
 ## 0.3.4
 
 ### Bug Fixes

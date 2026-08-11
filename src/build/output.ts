@@ -89,8 +89,11 @@ export function processTransform(
         continue;
       }
 
-      // Get alias for this sub-property from computed aliases
-      const aliasOf = subTokenAliases.get(suffix);
+      // Typography lineHeight is computed from its multiplier and fontSize.
+      // Preserving the original number alias would replace the absolute px
+      // value in Figma with the unitless multiplier.
+      const isComputedLineHeight = contextToken.$type === 'typography' && suffix === 'lineHeight';
+      const aliasOf = isComputedLineHeight ? undefined : subTokenAliases.get(suffix);
 
       let subParsed = withTokenMetadata(rawSubParsed, token);
 

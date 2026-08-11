@@ -1,0 +1,20 @@
+{
+  "$schema": "https://designtokens.org/schemas/2025.10/format.json",
+  "primitive": {
+    "dimension": {
+      "$type": "dimension",
+      "font-size": {
+        "$value": {
+          "value": 16,
+          "unit": "px"
+        }
+      }
+    },
+    "number": {
+      "$type": "number",
+      "line-height": {
+        "$value": 1.5
+      }
+    }
+  }
+}
