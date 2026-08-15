@@ -1,3 +1,4 @@
+import type { Resolver } from '@terrazzo/parser';
 import wcmatch from 'wildcard-match';
 import type {
   DTCGBorderValue,
@@ -34,6 +35,22 @@ export function toFigmaLocalID(tokenId: string): string {
  */
 export function createExcludeMatcher(patterns: string[] | undefined): (tokenId: string) => boolean {
   return patterns?.length ? wcmatch(patterns) : () => false;
+}
+
+/**
+ * Construct an input containing each active resolver modifier's default context.
+ * Uses the declared default, or the first context when no default is declared.
+ *
+ * @param resolver - The Terrazzo resolver instance
+ * @returns An input object containing the active modifier defaults
+ */
+export function getDefaultInput(resolver: Resolver): Record<string, string> {
+  return Object.fromEntries(
+    resolver.source.resolutionOrder
+      .filter((item) => item.type === 'modifier')
+      .map((modifier) => [modifier.name, modifier.default ?? Object.keys(modifier.contexts)[0]])
+      .filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
 }
 
 /**
