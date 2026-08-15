@@ -102,7 +102,7 @@ function transformToken(
  * permutations but only ~30 targeted inputs.
  */
 function collectBuildInputs(resolver: TransformHookOptions['resolver']): Record<string, string>[] {
-  const defaultInput: Record<string, string> = getDefaultInput(resolver);
+  const defaultInput = getDefaultInput(resolver);
   const inputs: Record<string, string>[] = [defaultInput];
 
   const resolverSource = resolver.source;
@@ -123,7 +123,7 @@ function collectBuildInputs(resolver: TransformHookOptions['resolver']): Record<
     }
     for (const contextName of Object.keys(modifier.contexts)) {
       // Skip if this is already the default value for this modifier
-      if ( contextName === modifier.default) {
+      if (defaultInput[modifierName] === contextName) {
         continue;
       }
       inputs.push({ ...defaultInput, [modifierName]: contextName });

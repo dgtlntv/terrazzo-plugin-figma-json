@@ -38,6 +38,22 @@ export function createExcludeMatcher(patterns: string[] | undefined): (tokenId: 
 }
 
 /**
+ * Construct an input containing each active resolver modifier's default context.
+ * Uses the declared default, or the first context when no default is declared.
+ *
+ * @param resolver - The Terrazzo resolver instance
+ * @returns An input object containing the active modifier defaults
+ */
+export function getDefaultInput(resolver: Resolver): Record<string, string> {
+  return Object.fromEntries(
+    resolver.source.resolutionOrder
+      .filter((item) => item.type === 'modifier')
+      .map((modifier) => [modifier.name, modifier.default ?? Object.keys(modifier.contexts)[0]])
+      .filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
+}
+
+/**
  * Filter extensions to only include Figma-specific ones (com.figma.*).
  * Removes non-Figma extensions to keep output clean.
  *
@@ -184,19 +200,4 @@ export function isDTCGBorderValue(value: unknown): value is DTCGBorderValue {
  */
 export function isDTCGGradientValue(value: unknown): value is DTCGGradientStop[] {
   return Array.isArray(value) && value.length > 0 && value.every((item) => item !== null && typeof item === 'object');
-}
-
-/**
- * Build a default input from the resolver's first permutation.
- *
- * @param resolver - The terrazzo resolver instance
- * @returns The first permutation input object, or an empty object if none exist
- */
-export function getDefaultInput(resolver: Resolver): Record<string, string> {
-  return Object.fromEntries(
-    resolver.source.resolutionOrder
-      .filter((m) => m.type === 'modifier')
-      .map((m) => [m.name, m.default ?? Object.keys(m.contexts)[0]])
-      .filter(([, v]) => v !== undefined),
-  );
 }

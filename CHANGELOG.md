@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.6
+
+### Bug Fixes
+
+- Construct the resolver's default modifier input directly from `resolutionOrder` instead of calling `listPermutations()`, allowing builds to proceed when Terrazzo disables permutation listing for resolvers with too many combinations.
+
 ## 0.3.5
 
 ### Bug Fixes
